@@ -14,3 +14,4 @@ categories = ["database"]
 
 [dependencies]
 eventstore = "0.4"
+structopt = "0.2"
