@@ -1,8 +1,8 @@
 use crate::args;
-
+use crate::common::CerberusError;
 use futures::future::Future;
 
-pub fn run(params: args::Args) {
+pub fn run(params: args::Args) -> Result<(), CerberusError> {
     let addr = params.parse_tcp_socket_addr();
     let connection = eventstore::Connection::builder()
         .connection_retry(eventstore::Retry::Only(0))
@@ -16,15 +16,15 @@ pub fn run(params: args::Args) {
 
     if let Err(e) = result {
         if let eventstore::OperationError::Aborted = e {
-            eprintln!(
-                "Failed to connect to node {}:{} through its public TCP port.",
-                params.host, params.port);
+            let error = CerberusError::ConnectionError(params.host, params.port);
 
-            return;
+            return Err(error);
         }
     }
 
     println!(
         "Successfully connected to node {}:{} through its public TCP port.",
         params.host, params.port);
+
+    Ok(())
 }
