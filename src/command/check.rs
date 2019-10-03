@@ -1,12 +1,15 @@
-use crate::args;
-use crate::common::CerberusError;
+use crate::common::{ CerberusResult, CerberusError };
 use futures::future::Future;
 
-pub fn run(params: args::Args) -> Result<(), CerberusError> {
-    let addr = params.parse_tcp_socket_addr();
-    let connection = eventstore::Connection::builder()
-        .connection_retry(eventstore::Retry::Only(0))
-        .single_node_connection(addr);
+pub fn run(global: &clap::ArgMatches, _: &clap::ArgMatches)
+    -> CerberusResult<()>
+{
+    let connection = crate::common::create_connection(global, |builder|
+    {
+        builder.connection_retry(eventstore::Retry::Only(0))
+    })?;
+
+    println!("Checking…");
 
     let result = connection.read_all()
         .start_from_beginning()
@@ -16,15 +19,14 @@ pub fn run(params: args::Args) -> Result<(), CerberusError> {
 
     if let Err(e) = result {
         if let eventstore::OperationError::Aborted = e {
-            let error = CerberusError::ConnectionError(params.host, params.port);
-
-            return Err(error);
+            return
+                Err(
+                    CerberusError::UserFault(
+                        "Failed to connect to database".to_owned()));
         }
     }
 
-    println!(
-        "Successfully connected to node {}:{} through its public TCP port.",
-        params.host, params.port);
+    println!("Successfully connect to the database");
 
     Ok(())
 }

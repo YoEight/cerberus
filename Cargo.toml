@@ -15,4 +15,5 @@ categories = ["database"]
 [dependencies]
 eventstore = "0.4"
 futures = "0.1"
-structopt = "0.2"
+structopt = "0.3"
+clap = "2.33"
