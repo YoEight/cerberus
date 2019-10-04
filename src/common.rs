@@ -57,8 +57,31 @@ pub fn create_connection<F>(params: &clap::ArgMatches, make: F)
         F: FnOnce(ConnectionBuilder) -> ConnectionBuilder
 {
     let mut endpoints = list_tcp_endpoints(params)?;
-    let builder = make(eventstore::Connection::builder());
+
+    let credentials_opt =
+        if let Some(login) = params.value_of("login") {
+            let password = params.value_of("password").unwrap_or("");
+
+            Some(eventstore::Credentials::new(login, password))
+        } else {
+            None
+        };
+
+    let mut builder = eventstore::Connection::builder();
+
+    if let Some(creds) = credentials_opt {
+        builder = builder.with_default_user(creds);
+    }
+
+    builder = make(builder);
+
     let endpoint = endpoints.pop().expect("We already checked that list was non-empty");
 
     Ok(builder.single_node_connection(endpoint))
+}
+
+pub fn create_connection_default(params: &clap::ArgMatches)
+    -> CerberusResult<eventstore::Connection>
+{
+    create_connection(params, |b| b)
 }

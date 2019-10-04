@@ -15,5 +15,6 @@ categories = ["database"]
 [dependencies]
 eventstore = "0.4"
 futures = "0.1"
-structopt = "0.3"
 clap = "2.33"
+serde = "1.0"
+serde_json = { version = "1.0", features = ["raw_value"] }

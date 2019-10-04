@@ -1,37 +1,47 @@
+#[macro_use]
+extern crate clap;
+
 mod command;
 mod common;
 
-use clap::{Arg, App, SubCommand};
-
 fn main()
 {
-    let matches = App::new("Cerberus - An EventStore administration tool")
-        .author("Yorick Laupa <yo.eight@gmail.com>")
-        .about("An EventStore administration tool")
-        .arg(Arg::with_name("host")
-            .short("h")
-            .long("host")
-            .value_name("HOST")
-            .help("A node host [default: localhost]")
-            .takes_value(true)
-            .multiple(true))
-        .arg(Arg::with_name("tcp-port")
-            .long("tcp-port")
-            .help("A node port [default: 1113]")
-            .takes_value(true))
-        .subcommand(SubCommand::with_name("check")
-            .about("Check if a database setup is reachable")
-            .help("Check if a database setup is reachable"))
-        .subcommand(SubCommand::with_name("list-events")
-            .about("List a stream's events")
-            .help("List a stream's events"))
-        .get_matches();
+    let matches = clap_app!(cerberus =>
+        (version: "1.0")
+        (author: "Yorick L. <yo.eight@gmail.com>")
+        (about: "An EventStore administration tool")
+        (@arg host: -h --host +takes_value +multiple "A node host [default: localhost]")
+        (@arg tcp_port: --tcp_port +takes_value +multiple "A node port [default: 1113]")
+        (@arg login: -l --login +takes_value "Your user's login")
+        (@arg password: --password +takes_value "Your user's password")
+        (@subcommand check =>
+            (about: "Check if a database setup is reachable")
+        )
+        (@subcommand list =>
+            (about: "List database entities")
+            (@arg ENTITY: +required "Database entity [events, subscriptions,…etc]")
+            (@arg stream: -s --stream +takes_value "A stream's name")
+            (@arg group_id: --group_id "Persistent subscription's group id")
+        )
+    ).get_matches();
 
     let result = {
         if let Some(params) = matches.subcommand_matches("check") {
             command::check::run(&matches, params)
-        } else if let Some(_params) = matches.subcommand_matches("list-events") {
-            unimplemented!()
+        } else if let Some(params) = matches.subcommand_matches("list") {
+            let entity = params.value_of("ENTITY")
+                .expect("Already checked by Clap that entity isn't empty");
+
+            match entity {
+                "events" => {
+                    command::list::events::run(&matches, params)
+                },
+
+                ignored =>
+                    Err(
+                        common::CerberusError::UserFault(
+                            format!("Listing [{}] entity is not supported yet", ignored))),
+            }
         } else {
             Ok(())
         }
