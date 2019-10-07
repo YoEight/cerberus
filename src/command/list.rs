@@ -63,3 +63,50 @@ pub mod events {
         }
     }
 }
+
+pub mod streams {
+    use crate::common::{ CerberusResult, CerberusError };
+    use futures::future::Future;
+    use futures::stream::Stream;
+
+    pub fn run(global: &clap::ArgMatches, _: &clap::ArgMatches)
+        -> CerberusResult<()>
+    {
+        let connection = crate::common::create_connection_default(global)?;
+
+        let stream = connection
+            .read_stream("$streams")
+            .resolve_link_tos(eventstore::LinkTos::ResolveLink)
+            .iterate_over();
+
+        let result = stream.fold(0usize, |pos, event|
+        {
+            let record = event.event.expect("Event field would be always defined in this situation");
+
+            println!("{}: {}", pos, record.event_stream_id);
+
+            Ok(pos + 1)
+        }).wait();
+
+        match result {
+            Err(e) =>
+                if let eventstore::OperationError::AccessDenied(_) = e {
+                    Err(
+                        CerberusError::UserFault(
+                            "Action denied: You can't list $streams stream with your current user credentials.".to_owned()))
+                } else {
+                    Err(
+                        CerberusError::UserFault(
+                            format!("Exception happened when streaming the stream (huhuh): {}", e)))
+                },
+
+            Ok(pos) => {
+                if pos == 0 {
+                    println!("You have no user-defined streams yet");
+                }
+
+                Ok(())
+            },
+        }
+    }
+}

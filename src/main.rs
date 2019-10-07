@@ -37,6 +37,11 @@ fn main()
                     command::list::events::run(&matches, params)
                 },
 
+                "streams" => {
+                    command::list::streams::run(&matches, params)
+                },
+
+
                 ignored =>
                     Err(
                         common::CerberusError::UserFault(
