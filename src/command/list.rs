@@ -109,9 +109,14 @@ pub mod streams {
         match result {
             Err(e) =>
                 if let eventstore::OperationError::AccessDenied(_) = e {
-                    Err(
-                        CerberusError::UserFault(
-                            "Action denied: You can't list $streams stream with your current user credentials.".to_owned()))
+                    let msg =
+                        "Action denied: You can't list $streams stream with \
+                        your current user credentials. It also possible you haven't \
+                        enable system projections or start system projections. You can \
+                        do both when starting the server or, if you already enabled projections, \
+                        you can start those in the administration web page.";
+
+                    Err(CerberusError::UserFault(msg.to_owned()))
                 } else {
                     Err(
                         CerberusError::UserFault(
