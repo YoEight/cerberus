@@ -81,9 +81,27 @@ pub mod streams {
 
         let result = stream.fold(0usize, |pos, event|
         {
-            let record = event.event.expect("Event field would be always defined in this situation");
+            match event.event {
+                None => {
+                    // It means we are in a situation where a stream got deleted.
+                    let record = event
+                        .link
+                        .expect("Link field would be always defined in this situation");
 
-            println!("{}: {}", pos, record.event_stream_id);
+                    unsafe {
+                        let data = std::str::from_utf8_unchecked(&record.data);
+
+                        // In this case, the data looks like the following:
+                        // 0@whatever_stream_name_was
+                        let (_, stream_name) = data.split_at(2);
+                        println!("{}: [DELETED] {}", pos, stream_name);
+                    }
+                },
+
+                Some(record) => {
+                    println!("{}: {}", pos, record.event_stream_id);
+                }
+            }
 
             Ok(pos + 1)
         }).wait();
