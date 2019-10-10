@@ -1,29 +1,61 @@
-#[macro_use]
-extern crate clap;
-
 mod command;
 mod common;
 
+use clap::{ Arg, App, SubCommand };
+
 fn main()
 {
-    let matches = clap_app!(cerberus =>
-        (version: "1.0")
-        (author: "Yorick L. <yo.eight@gmail.com>")
-        (about: "An EventStore administration tool")
-        (@arg host: -h --host +takes_value +multiple "A node host [default: localhost]")
-        (@arg tcp_port: --tcp_port +takes_value +multiple "A node port [default: 1113]")
-        (@arg login: -l --login +takes_value "Your user's login")
-        (@arg password: --password +takes_value "Your user's password")
-        (@subcommand check =>
-            (about: "Check if a database setup is reachable")
-        )
-        (@subcommand list =>
-            (about: "List database entities")
-            (@arg ENTITY: +required "Database entity [events, subscriptions,…etc]")
-            (@arg stream: -s --stream +takes_value "A stream's name")
-            (@arg group_id: --group_id "Persistent subscription's group id")
-        )
-    ).get_matches();
+    let matches = App::new("Cerberus")
+        .version("1.0")
+        .about("An EventStore administration tool.")
+        .author("Yorick L. <yo.eight@gmail.com>")
+        .arg(Arg::with_name("login")
+            .help("Your user's login")
+            .short("l")
+            .value_name("LOGIN")
+            .long("login")
+            .takes_value(true))
+        .arg(Arg::with_name("password")
+            .help("Your user's password")
+            .value_name("PASSWORD")
+            .long("password")
+            .takes_value(true))
+        .arg(Arg::with_name("host")
+            .help("A node host [default: localhost]")
+            .value_name("HOST")
+            .short("h")
+            .long("host")
+            .takes_value(true)
+            .multiple(true))
+        .arg(Arg::with_name("tcp-port")
+            .help("A node port [default: 1113]")
+            .value_name("PORT")
+            .long("tcp-port")
+            .takes_value(true))
+        .subcommand(SubCommand::with_name("check")
+            .about("Check if a database setup is reachable"))
+        .subcommand(SubCommand::with_name("list")
+            .about("List database entities")
+            .arg(Arg::with_name("ENTITY")
+                .required(true)
+                .help("Database entity [events, subscriptions,…etc]"))
+            .arg(Arg::with_name("stream")
+                .help("A stream's name")
+                .short("s")
+                .long("stream")
+                .value_name("STREAM_NAME")
+                .takes_value(true))
+            .arg(Arg::with_name("group-id")
+                .help("Persistent subscription's group id")
+                .long("group-id")
+                .value_name("GROUP_ID")
+                .takes_value(true))
+            .arg(Arg::with_name("category")
+                .help("Listing by category of streams")
+                .long("by-category")
+                .value_name("CATEGORY")
+                .takes_value(true)))
+        .get_matches();
 
     let result = {
         if let Some(params) = matches.subcommand_matches("check") {

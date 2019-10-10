@@ -69,13 +69,22 @@ pub mod streams {
     use futures::future::Future;
     use futures::stream::Stream;
 
-    pub fn run(global: &clap::ArgMatches, _: &clap::ArgMatches)
+    fn get_stream_name(params: &clap::ArgMatches) -> String {
+        if let Some(category) = params.value_of("category") {
+            return format!("$ce-{}", category);
+        } else {
+            "$streams".to_owned()
+        }
+    }
+
+    pub fn run(global: &clap::ArgMatches, params: &clap::ArgMatches)
         -> CerberusResult<()>
     {
         let connection = crate::common::create_connection_default(global)?;
+        let stream_name = get_stream_name(params);
 
         let stream = connection
-            .read_stream("$streams")
+            .read_stream(stream_name.as_str())
             .resolve_link_tos(eventstore::LinkTos::ResolveLink)
             .iterate_over();
 
@@ -110,13 +119,14 @@ pub mod streams {
             Err(e) =>
                 if let eventstore::OperationError::AccessDenied(_) = e {
                     let msg =
-                        "Action denied: You can't list $streams stream with \
-                        your current user credentials. It also possible you haven't \
-                        enable system projections or start system projections. You can \
-                        do both when starting the server or, if you already enabled projections, \
-                        you can start those in the administration web page.";
+                        format!(
+                            "Action denied: You can't list [{}] stream with \
+                            your current user credentials. It also possible you haven't \
+                            enable system projections or start system projections. You can \
+                            do both when starting the server or, if you already enabled projections, \
+                            you can start those in the administration web page.", stream_name);
 
-                    Err(CerberusError::UserFault(msg.to_owned()))
+                    Err(CerberusError::UserFault(msg))
                 } else {
                     Err(
                         CerberusError::UserFault(
