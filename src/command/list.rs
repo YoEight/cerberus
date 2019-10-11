@@ -3,14 +3,27 @@ pub mod events {
     use futures::future::Future;
     use futures::stream::Stream;
 
+    fn get_stream_name(original_stream_name: &str, params: &clap::ArgMatches) -> String
+    {
+        if let Some(group_id) = params.value_of("group-id") {
+            if params.is_present("checkpoint") {
+                format!("$persistentsubscription-{}::{}-checkpoint", original_stream_name, group_id)
+            } else {
+                format!("$persistentsubscription-{}::{}-parked", original_stream_name, group_id)
+            }
+        } else {
+            original_stream_name.to_owned()
+        }
+    }
+
     pub fn run(global: &clap::ArgMatches, params: &clap::ArgMatches)
         -> CerberusResult<()>
     {
         let connection = crate::common::create_connection_default(global)?;
 
-        if let Some(stream_name) = params.value_of("stream") {
+        if let Some(original_stream_name) = params.value_of("stream") {
             let stream = connection
-                .read_stream(stream_name)
+                .read_stream(get_stream_name(original_stream_name, params))
                 .resolve_link_tos(eventstore::LinkTos::ResolveLink)
                 .iterate_over();
 

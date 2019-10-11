@@ -40,18 +40,27 @@ fn main()
                 .required(true)
                 .help("Database entity [events, subscriptions,…etc]"))
             .arg(Arg::with_name("stream")
-                .help("A stream's name")
+                .help("For events entity, represents a stream's name")
                 .short("s")
                 .long("stream")
                 .value_name("STREAM_NAME")
                 .takes_value(true))
             .arg(Arg::with_name("group-id")
-                .help("Persistent subscription's group id")
-                .long("group-id")
+                .help(
+                    "For events entity, represents persistent subscription's \
+                    group id. When used, it will display the parked events of \
+                    persistent subscription")
+                .long("with-group-id")
                 .value_name("GROUP_ID")
                 .takes_value(true))
+            .arg(Arg::with_name("checkpoint")
+                .help(
+                    "For events entity, represents where a persistent subscriptions \
+                    is (in term of event number in the stream). You need to provide \
+                    --with-group-id so this flag is taken into account")
+                .long("checkpoint"))
             .arg(Arg::with_name("category")
-                .help("Listing by category of streams")
+                .help("For streams entity, list streams by category")
                 .long("by-category")
                 .value_name("CATEGORY")
                 .takes_value(true)))
