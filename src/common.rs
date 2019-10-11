@@ -1,7 +1,51 @@
 use eventstore::ConnectionBuilder;
+use serde::{ Serialize, Deserialize };
 use std::error::Error;
 use std::fmt;
 use std::net::{ SocketAddr, ToSocketAddrs };
+
+pub struct User<'a> {
+    pub login: &'a str,
+    pub password: Option<&'a str>,
+}
+
+impl<'a> User<'a> {
+    pub fn from_args(global: &'a clap::ArgMatches) -> Option<User<'a>> {
+        global.value_of("login").map(|login|
+        {
+            let password = global.value_of("password");
+
+            User {
+                login,
+                password,
+            }
+        })
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct SubscriptionSummary {
+    #[serde(rename = "eventStreamId")]
+    pub event_stream_id: String,
+
+    #[serde(rename = "groupName")]
+    pub group_name: String,
+
+    #[serde(rename = "status")]
+    pub status: String,
+
+    #[serde(rename = "averageItemsPerSecond")]
+    pub average_items_per_sec: f64,
+
+    #[serde(rename = "lastProcessedEventNumber")]
+    pub last_processed_event_number: i64,
+
+    #[serde(rename = "lastKnownEventNumber")]
+    pub last_known_event_number: i64,
+
+    #[serde(rename = "connectionCount")]
+    pub connection_count: i64,
+}
 
 #[derive(Debug)]
 pub enum CerberusError {
@@ -84,4 +128,21 @@ pub fn create_connection_default(params: &clap::ArgMatches)
     -> CerberusResult<eventstore::Connection>
 {
     create_connection(params, |b| b)
+}
+
+// TODO - Not sure what strategy we should pick in case of a cluster.
+// Do we try to pick the elected node first?
+pub fn create_node_uri(params: &clap::ArgMatches)
+    -> String
+{
+    let mut hosts = params.values_of_lossy("host")
+        .unwrap_or(vec!["localhost".to_owned()]);
+
+    let mut ports = params.values_of_lossy("http-port")
+        .unwrap_or(vec!["2113".to_owned()]);
+
+    let host = hosts.pop().unwrap();
+    let port = ports.pop().unwrap();
+
+    format!("http://{}:{}", host, port)
 }

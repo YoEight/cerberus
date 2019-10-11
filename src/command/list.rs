@@ -156,3 +156,46 @@ pub mod streams {
         }
     }
 }
+
+pub mod subscriptions {
+    use crate::common::{ CerberusResult, CerberusError, User };
+
+    pub fn run(global: &clap::ArgMatches, _: &clap::ArgMatches, user_opt: Option<User>)
+        -> CerberusResult<()>
+    {
+        let base_url = crate::common::create_node_uri(global);
+
+        let mut req = reqwest::Client::new()
+            .get(&format!("{}/subscriptions", base_url));
+
+        if let Some(user) = user_opt {
+            req = req.basic_auth(user.login, user.password);
+        }
+
+        let mut resp = req.send().map_err(|e|
+        {
+            CerberusError::UserFault(
+                format!("Failed to list persistent subscriptions: {}", e))
+        })?;
+
+        let subs: Vec<crate::common::SubscriptionSummary> = resp.json().map_err(|e|
+        {
+            CerberusError::UserFault(
+                format!("Failed to deserialize SubscriptionSummary: {}", e))
+        })?;
+
+        for sub in subs {
+            let process_diff = sub.last_known_event_number - sub.last_processed_event_number;
+
+            println!("--------------------------------------------------------------");
+            println!("Stream: {}", sub.event_stream_id);
+            println!("Group: {}", sub.group_name);
+            println!("Status: {}", sub.status);
+            println!("Connections : {}", sub.connection_count);
+            println!("Processed / Known: {} / {} ({})", sub.last_processed_event_number, sub.last_known_event_number, process_diff);
+            println!("Processing speed : {} msgs/sec", sub.average_items_per_sec);
+        }
+
+        Ok(())
+    }
+}

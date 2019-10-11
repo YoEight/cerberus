@@ -28,10 +28,16 @@ fn main()
             .takes_value(true)
             .multiple(true))
         .arg(Arg::with_name("tcp-port")
-            .help("A node port [default: 1113]")
+            .help("A node TCP port [default: 1113]")
             .value_name("PORT")
             .long("tcp-port")
             .takes_value(true))
+        .arg(Arg::with_name("http-port")
+            .help("A node HTTP port [default: 2113]")
+            .value_name("PORT")
+            .long("http-port")
+            .takes_value(true)
+            .multiple(true))
         .subcommand(SubCommand::with_name("check")
             .about("Check if a database setup is reachable"))
         .subcommand(SubCommand::with_name("list")
@@ -66,6 +72,8 @@ fn main()
                 .takes_value(true)))
         .get_matches();
 
+    let user_opt = common::User::from_args(&matches);
+
     let result = {
         if let Some(params) = matches.subcommand_matches("check") {
             command::check::run(&matches, params)
@@ -82,6 +90,9 @@ fn main()
                     command::list::streams::run(&matches, params)
                 },
 
+                "subscriptions" => {
+                    command::list::subscriptions::run(&matches, params, user_opt)
+                },
 
                 ignored =>
                     Err(
