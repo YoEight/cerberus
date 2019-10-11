@@ -46,17 +46,16 @@ fn main()
                 .required(true)
                 .help("Database entity [events, subscriptions,…etc]"))
             .arg(Arg::with_name("stream")
-                .help("For events entity, represents a stream's name")
+                .help("For events and subscription entities, represents a stream's name")
                 .short("s")
                 .long("stream")
                 .value_name("STREAM_NAME")
                 .takes_value(true))
             .arg(Arg::with_name("group-id")
                 .help(
-                    "For events entity, represents persistent subscription's \
-                    group id. When used, it will display the parked events of \
-                    persistent subscription")
-                .long("with-group-id")
+                    "For events and subscription entities, represents persistent subscription's \
+                    group id")
+                .long("group-id")
                 .value_name("GROUP_ID")
                 .takes_value(true))
             .arg(Arg::with_name("checkpoint")
@@ -98,6 +97,10 @@ fn main()
 
                 "subscriptions" => {
                     command::list::subscriptions::run(&matches, params, user_opt)
+                },
+
+                "subscription" => {
+                    command::list::subscription::run(&matches, params, user_opt)
                 },
 
                 ignored =>
