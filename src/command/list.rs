@@ -1,5 +1,6 @@
 pub mod events {
     use crate::common::{ CerberusResult, CerberusError };
+    use eventstore::{ ResolvedEvent, OperationError };
     use futures::future::Future;
     use futures::stream::Stream;
 
@@ -22,10 +23,24 @@ pub mod events {
         let connection = crate::common::create_connection_default(global)?;
 
         if let Some(original_stream_name) = params.value_of("stream") {
-            let stream = connection
+            let command = connection
                 .read_stream(get_stream_name(original_stream_name, params))
-                .resolve_link_tos(eventstore::LinkTos::ResolveLink)
-                .iterate_over();
+                .resolve_link_tos(eventstore::LinkTos::ResolveLink);
+
+            let stream: Box<dyn Stream<Item=ResolvedEvent, Error=OperationError>> =
+                if params.is_present("recent") {
+                    // We also force `max_count` to 50 because there is no need
+                    // asking the server to load more than that.
+                    let stream = command
+                        .max_count(50)
+                        .start_from_end_of_stream()
+                        .iterate_over()
+                        .take(50);
+
+                    Box::new(stream)
+                } else {
+                    Box::new(command.iterate_over())
+                };
 
             let result = stream.for_each(|event|
             {
@@ -79,6 +94,7 @@ pub mod events {
 
 pub mod streams {
     use crate::common::{ CerberusResult, CerberusError };
+    use eventstore::{ ResolvedEvent, OperationError };
     use futures::future::Future;
     use futures::stream::Stream;
 
@@ -96,12 +112,26 @@ pub mod streams {
         let connection = crate::common::create_connection_default(global)?;
         let stream_name = get_stream_name(params);
 
-        let stream = connection
+        let command = connection
             .read_stream(stream_name.as_str())
-            .resolve_link_tos(eventstore::LinkTos::ResolveLink)
-            .iterate_over();
+            .resolve_link_tos(eventstore::LinkTos::ResolveLink);
 
-        let result = stream.fold(0usize, |pos, event|
+        let stream: Box<dyn Stream<Item=ResolvedEvent, Error=OperationError>> =
+            if params.is_present("recent") {
+                // We also force `max_count` to 50 because there is no need
+                // asking the server to load more than that.
+                let stream = command
+                    .max_count(50)
+                    .start_from_end_of_stream()
+                    .iterate_over()
+                    .take(50);
+
+                Box::new(stream)
+            } else {
+                Box::new(command.iterate_over())
+            };
+
+        let result = stream.fold(1usize, |pos, event|
         {
             match event.event {
                 None => {

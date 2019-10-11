@@ -69,7 +69,10 @@ fn main()
                 .help("For streams entity, list streams by category")
                 .long("by-category")
                 .value_name("CATEGORY")
-                .takes_value(true)))
+                .takes_value(true))
+            .arg(Arg::with_name("recent")
+                .help("For streams and events entities, takes the recent 50 entries")
+                .long("recent")))
         .get_matches();
 
     let user_opt = common::User::from_args(&matches);
