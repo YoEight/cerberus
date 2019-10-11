@@ -190,7 +190,7 @@ pub mod streams {
 pub mod subscriptions {
     use crate::common::{ CerberusResult, CerberusError, User };
 
-    pub fn run(global: &clap::ArgMatches, _: &clap::ArgMatches, user_opt: Option<User>)
+    pub fn run(global: &clap::ArgMatches, params: &clap::ArgMatches, user_opt: Option<User>)
         -> CerberusResult<()>
     {
         let base_url = crate::common::create_node_uri(global);
@@ -208,22 +208,36 @@ pub mod subscriptions {
                 format!("Failed to list persistent subscriptions: {}", e))
         })?;
 
-        let subs: Vec<crate::common::SubscriptionSummary> = resp.json().map_err(|e|
-        {
-            CerberusError::UserFault(
-                format!("Failed to deserialize SubscriptionSummary: {}", e))
-        })?;
+        if params.is_present("raw") {
+            let subs: Vec<serde_json::value::Value> = resp.json().map_err(|e|
+            {
+                CerberusError::UserFault(
+                    format!("Failed to deserialize SubscriptionSummary: {}", e))
+            })?;
 
-        for sub in subs {
-            let process_diff = sub.last_known_event_number - sub.last_processed_event_number;
+            for sub in subs {
+                println!("--------------------------------------------------------------");
+                serde_json::to_writer_pretty(std::io::stdout(), &sub).unwrap();
+                println!();
+            }
+        } else {
+            let subs: Vec<crate::common::SubscriptionSummary> = resp.json().map_err(|e|
+            {
+                CerberusError::UserFault(
+                    format!("Failed to deserialize SubscriptionSummary: {}", e))
+            })?;
 
-            println!("--------------------------------------------------------------");
-            println!("Stream: {}", sub.event_stream_id);
-            println!("Group: {}", sub.group_name);
-            println!("Status: {}", sub.status);
-            println!("Connections : {}", sub.connection_count);
-            println!("Processed / Known: {} / {} ({})", sub.last_processed_event_number, sub.last_known_event_number, process_diff);
-            println!("Processing speed : {} msgs/sec", sub.average_items_per_sec);
+            for sub in subs {
+                let process_diff = sub.last_known_event_number - sub.last_processed_event_number;
+
+                println!("--------------------------------------------------------------");
+                println!("Stream: {}", sub.event_stream_id);
+                println!("Group: {}", sub.group_name);
+                println!("Status: {}", sub.status);
+                println!("Connections : {}", sub.connection_count);
+                println!("Processed / Known: {} / {} ({})", sub.last_processed_event_number, sub.last_known_event_number, process_diff);
+                println!("Processing speed : {} msgs/sec", sub.average_items_per_sec);
+            }
         }
 
         Ok(())

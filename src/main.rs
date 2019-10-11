@@ -72,7 +72,10 @@ fn main()
                 .takes_value(true))
             .arg(Arg::with_name("recent")
                 .help("For streams and events entities, takes the recent 50 entries")
-                .long("recent")))
+                .long("recent"))
+            .arg(Arg::with_name("raw")
+                .help("For subscription(s) entities, show as much data as the server provides")
+                .long("raw")))
         .get_matches();
 
     let user_opt = common::User::from_args(&matches);
