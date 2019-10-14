@@ -21,6 +21,10 @@ impl<'a> User<'a> {
             }
         })
     }
+
+    pub fn to_credentials(&self) -> eventstore::Credentials {
+        eventstore::Credentials::new(self.login, self.password.unwrap_or(""))
+    }
 }
 
 #[derive(Serialize, Deserialize)]
