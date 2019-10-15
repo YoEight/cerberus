@@ -135,7 +135,7 @@ pub mod subscription {
             setts.named_consumer_strategy = strategy;
         }
 
-        let mut cmd = connection.create_persistent_subscription(stream_name, group_id)
+        let mut cmd = connection.update_persistent_subscription(stream_name, group_id)
             .settings(setts);
 
         if let Some(creds) = user_opt.map(|usr| usr.to_credentials()) {
@@ -149,7 +149,7 @@ pub mod subscription {
                 eventstore::OperationError::AccessDenied(_) => {
                     Err(CerberusError::UserFault(
                         format!(
-                            "Your current credentials doesn't allow you to create \
+                            "Your current credentials doesn't allow you to update \
                             a persistent subscription on [{}] stream.", stream_name)))
                 },
 
@@ -173,7 +173,7 @@ pub mod subscription {
                     eventstore::PersistActionError::AccessDenied =>
                         Err(CerberusError::UserFault(
                             format!(
-                                "Your current credentials doesn't allow you to create \
+                                "Your current credentials doesn't allow you to update \
                                 a persistent subscription on [{}] stream.", stream_name))),
 
                     eventstore::PersistActionError::AlreadyExists =>
@@ -182,25 +182,22 @@ pub mod subscription {
                                 "A persistent subscription already exists for the stream \
                                 [{}] with the group [{}]", stream_name, group_id))),
 
-                    // TODO - Pretty sure that use-case can't exist when creating a persistent
-                    // subscription on a non existing stream. EventStore tends to not giving
-                    // crap about this.
                     eventstore::PersistActionError::DoesNotExist =>
                         Err(CerberusError::UserFault(
                             format!(
-                                "You can't create a persistent subscription on stream [{}] \
-                                because [{}] stream doesn't exist", stream_name, stream_name))),
+                                "You can't update a persistent subscription on stream [{}] \
+                                with group-id [{}] because the subscription doesn't exist", stream_name, group_id))),
 
                     eventstore::PersistActionError::Fail =>
                         Err(CerberusError::UserFault(
                             format!(
-                                "Failed to create a persistent subscription on stream \
+                                "Failed to update a persistent subscription on stream \
                                 [{}] with group [{}] but we don't have \
                                 information on why", stream_name, group_id))),
                 },
 
                 _ => {
-                    println!("Persistent subscription created.");
+                    println!("Persistent subscription updated.");
 
                     Ok(())
                 }
