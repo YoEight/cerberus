@@ -208,3 +208,64 @@ pub mod subscription {
         }
     }
 }
+
+pub mod projection {
+    use crate::common::{ CerberusError, CerberusResult, User };
+    use reqwest::header;
+
+    pub fn run(global: &clap::ArgMatches, params: &clap::ArgMatches, user_opt: Option<User>)
+        -> CerberusResult<()>
+    {
+        let base_url = crate::common::create_node_uri(global);
+        let name = params.value_of("name").expect("Name was check by Clap already");
+        let kind = params.value_of("kind").expect("Kind was check by clap already");
+        let enabled = format!("{}", params.is_present("enabled"));
+        let emit = format!("{}", params.is_present("emit"));
+        let checkpoints = format!("{}", params.is_present("checkpoints"));
+        let script_filepath = params.value_of("SCRIPT").expect("SCRIPT was check by clap already");
+
+        let script = std::fs::read_to_string(script_filepath).map_err(|e|
+        {
+            CerberusError::UserFault(
+                format!("There was an issue with the script's filepath you submitted: {}", e))
+        })?;
+
+        let query = [
+            // ("name", name),
+            ("enabled", enabled.as_str()),
+            ("emit", emit.as_str()),
+            ("checkoints", checkpoints.as_str()),
+            ("type", "JS")
+        ];
+
+        let mut req = reqwest::Client::new()
+            .post(&format!("{}/projections/{}", base_url, kind))
+            .header(header::CONTENT_TYPE, "application/json;charset=UTF-8")
+            .query(&query)
+            .body(script);
+
+        if let Some(user) = user_opt {
+            req = req.basic_auth(user.login, user.password);
+        }
+
+        let mut resp = req.send().map_err(|e| {
+            CerberusError::UserFault(
+                format!("Failed to create a projection: {}", e))
+        })?;
+
+        if resp.status().as_u16() == 401 {
+            return Err(
+                CerberusError::UserFault(
+                    "Your current user cannot create a projection.".to_owned()));
+        }
+
+        // let result: serde_json::value::Value = resp.json().unwrap();
+        let result = resp.text().unwrap();
+        // serde_json::to_writer_pretty(std::io::stdout(), &result).unwrap();
+        println!("Result: {}", result);
+
+        // println!("Projection is created: {:?}", resp);
+
+        Ok(())
+    }
+}

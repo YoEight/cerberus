@@ -282,12 +282,16 @@ fn main()
             .arg(Arg::with_name("emit")
                 .help("Enable the ability for the projection to write to streams")
                 .long("emit"))
-            .arg(Arg::with_name("checkpoint")
+            .arg(Arg::with_name("checkpoints")
                 .help("Enable checkpoints. Think saving progression, like in video games")
                 .long("checkpoint"))
             .arg(Arg::with_name("track-emitted-streams")
                 .help("Write the name of the streams the projection is managing to a separate stream")
-                .long("track-emitted-streams")))
+                .long("track-emitted-streams"))
+            .arg(Arg::with_name("SCRIPT")
+                .help("Path to the projection's Javascript script")
+                .required(true)
+                .value_name("FILEPATH")))
         .get_matches();
 
     let user_opt = common::User::from_args(&matches);
@@ -327,6 +331,8 @@ fn main()
             command::update::subscription::run(&matches, params, user_opt)
         } else if let Some(params) = matches.subcommand_matches("delete-subscription") {
             command::delete::subscription::run(&matches, params, user_opt)
+        } else if let Some(params) = matches.subcommand_matches("create-projection") {
+            command::create::projection::run(&matches, params, user_opt)
         } else {
             Ok(())
         }
