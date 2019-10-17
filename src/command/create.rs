@@ -217,7 +217,6 @@ pub mod projection {
         -> CerberusResult<()>
     {
         let base_url = crate::common::create_node_uri(global);
-        let name = params.value_of("name").expect("Name was check by Clap already");
         let kind = params.value_of("kind").expect("Kind was check by clap already");
         let enabled = format!("{}", params.is_present("enabled"));
         let emit = format!("{}", params.is_present("emit"));
@@ -230,13 +229,16 @@ pub mod projection {
                 format!("There was an issue with the script's filepath you submitted: {}", e))
         })?;
 
-        let query = [
-            // ("name", name),
+        let mut query = vec![
             ("enabled", enabled.as_str()),
             ("emit", emit.as_str()),
             ("checkoints", checkpoints.as_str()),
             ("type", "JS")
         ];
+
+        if let Some(name) = params.value_of("name") {
+            query.push(("name", name));
+        }
 
         let mut req = reqwest::Client::new()
             .post(&format!("{}/projections/{}", base_url, kind))

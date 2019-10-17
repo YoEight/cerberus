@@ -292,6 +292,14 @@ fn main()
                 .help("Path to the projection's Javascript script")
                 .required(true)
                 .value_name("FILEPATH")))
+        .subcommand(SubCommand::with_name("list-projections")
+            .about("List all projections")
+            .arg(Arg::with_name("kind")
+                .help("Kind of projection [onetime, transient, continuous, all-non-transient, any: default any]")
+                .value_name("KIND")
+                .short("k")
+                .long("kind")
+                .takes_value(true)))
         .get_matches();
 
     let user_opt = common::User::from_args(&matches);
@@ -333,6 +341,8 @@ fn main()
             command::delete::subscription::run(&matches, params, user_opt)
         } else if let Some(params) = matches.subcommand_matches("create-projection") {
             command::create::projection::run(&matches, params, user_opt)
+        } else if let Some(params) = matches.subcommand_matches("list-projections") {
+            command::list::projections::run(&matches, params, user_opt)
         } else {
             Ok(())
         }
