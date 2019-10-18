@@ -246,7 +246,7 @@ pub mod projection {
             .query(&query)
             .body(script);
 
-        if let Some(user) = user_opt {
+        if let Some(user) = user_opt.as_ref() {
             req = req.basic_auth(user.login, user.password);
         }
 
@@ -255,18 +255,21 @@ pub mod projection {
                 format!("Failed to create a projection: {}", e))
         })?;
 
-        if resp.status().as_u16() == 401 {
+        let resp_status = resp.status().as_u16();
+
+        if resp_status == 401 {
             return Err(
                 CerberusError::UserFault(
                     "Your current user cannot create a projection.".to_owned()));
+        } else if resp_status == 409 {
+            return Err(
+                CerberusError::UserFault(
+                    format!("Conflict Error: {}", resp.text().unwrap())));
         }
 
-        // let result: serde_json::value::Value = resp.json().unwrap();
-        let result = resp.text().unwrap();
-        // serde_json::to_writer_pretty(std::io::stdout(), &result).unwrap();
-        println!("Result: {}", result);
+        let result: crate::common::ProjectionCreationSuccess = resp.json().unwrap();
 
-        // println!("Projection is created: {:?}", resp);
+        println!("Projection [{}] created", result.name);
 
         Ok(())
     }

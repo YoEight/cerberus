@@ -63,6 +63,13 @@ pub struct Projection {
     pub status: String,
 }
 
+#[derive(Serialize, Deserialize, Debug)]
+pub struct ProjectionCreationSuccess {
+    #[serde(rename = "msgTypeId")]
+    pub msg_type: usize,
+    pub name: String,
+}
+
 #[derive(Debug)]
 pub enum CerberusError {
     UserFault(String),
