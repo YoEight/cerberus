@@ -208,3 +208,69 @@ pub mod subscription {
         }
     }
 }
+
+pub mod projection {
+    use crate::common::{ CerberusError, CerberusResult, User };
+    use reqwest::header;
+
+    pub fn run(global: &clap::ArgMatches, params: &clap::ArgMatches, user_opt: Option<User>)
+        -> CerberusResult<()>
+    {
+        let base_url = crate::common::create_node_uri(global);
+        let kind = params.value_of("kind").expect("Kind was check by clap already");
+        let enabled = format!("{}", params.is_present("enabled"));
+        let emit = format!("{}", params.is_present("emit"));
+        let checkpoints = format!("{}", params.is_present("checkpoints"));
+        let script_filepath = params.value_of("SCRIPT").expect("SCRIPT was check by clap already");
+
+        let script = std::fs::read_to_string(script_filepath).map_err(|e|
+        {
+            CerberusError::UserFault(
+                format!("There was an issue with the script's filepath you submitted: {}", e))
+        })?;
+
+        let mut query = vec![
+            ("enabled", enabled.as_str()),
+            ("emit", emit.as_str()),
+            ("checkoints", checkpoints.as_str()),
+            ("type", "JS")
+        ];
+
+        if let Some(name) = params.value_of("name") {
+            query.push(("name", name));
+        }
+
+        let mut req = reqwest::Client::new()
+            .post(&format!("{}/projections/{}", base_url, kind))
+            .header(header::CONTENT_TYPE, "application/json;charset=UTF-8")
+            .query(&query)
+            .body(script);
+
+        if let Some(user) = user_opt.as_ref() {
+            req = req.basic_auth(user.login, user.password);
+        }
+
+        let mut resp = req.send().map_err(|e| {
+            CerberusError::UserFault(
+                format!("Failed to create a projection: {}", e))
+        })?;
+
+        let resp_status = resp.status().as_u16();
+
+        if resp_status == 401 {
+            return Err(
+                CerberusError::UserFault(
+                    "Your current user cannot create a projection.".to_owned()));
+        } else if resp_status == 409 {
+            return Err(
+                CerberusError::UserFault(
+                    format!("Conflict Error: {}", resp.text().unwrap())));
+        }
+
+        let result: crate::common::ProjectionCreationSuccess = resp.json().unwrap();
+
+        println!("Projection [{}] created", result.name);
+
+        Ok(())
+    }
+}

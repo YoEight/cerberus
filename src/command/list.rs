@@ -288,3 +288,66 @@ pub mod subscription {
         }
     }
 }
+
+pub mod projections {
+    use crate::common::{ CerberusResult, CerberusError, User, Projections };
+
+    const KINDS: &[&str] = &[
+        "any",
+        "transient",
+        "onetime",
+        "continuous",
+        "all-non-transient"
+    ];
+
+    fn is_valid_kind(submitted: &str) -> bool
+    {
+        for kind in KINDS {
+            if submitted == *kind {
+                return true;
+            }
+        }
+
+        false
+    }
+
+    pub fn run(global: &clap::ArgMatches, params: &clap::ArgMatches, user_opt: Option<User>)
+        -> CerberusResult<()>
+    {
+        let base_url = crate::common::create_node_uri(global);
+        let kind = params.value_of("kind").unwrap_or("any");
+
+        if !is_valid_kind(kind) {
+            return Err(
+                CerberusError::UserFault(
+                    format!("Invalid kind value [{}]. Possible values: {:?}", kind, KINDS)));
+        }
+
+        let mut req = reqwest::Client::new()
+            .get(&format!("{}/projections/{}", base_url, kind));
+
+        if let Some(user) = user_opt {
+            req = req.basic_auth(user.login, user.password);
+        }
+
+        let mut resp = req.send().map_err(|e|
+        {
+            CerberusError::UserFault(
+                format!("Failed to list projection: {}", e))
+        })?;
+
+        if resp.status().as_u16() == 401 {
+            return Err(
+                CerberusError::UserFault(
+                    "Your current user cannot list projections.".to_owned()));
+        }
+
+        let result: Projections = resp.json().unwrap();
+
+        for proj in result.projections {
+            println!("{} [mode: {}] [status: {}]", proj.name, proj.mode, proj.status);
+        }
+
+        Ok(())
+    }
+}

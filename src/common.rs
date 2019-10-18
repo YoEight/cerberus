@@ -51,6 +51,25 @@ pub struct SubscriptionSummary {
     pub connection_count: i64,
 }
 
+#[derive(Serialize, Deserialize)]
+pub struct Projections {
+    pub projections: Vec<Projection>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct Projection {
+    pub name: String,
+    pub mode: String,
+    pub status: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct ProjectionCreationSuccess {
+    #[serde(rename = "msgTypeId")]
+    pub msg_type: usize,
+    pub name: String,
+}
+
 #[derive(Debug)]
 pub enum CerberusError {
     UserFault(String),
