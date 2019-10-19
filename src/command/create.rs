@@ -210,7 +210,7 @@ pub mod subscription {
 }
 
 pub mod projection {
-    use crate::common::{ CerberusError, CerberusResult, User };
+    use crate::common::{ CerberusError, CerberusResult, User, ProjectionCreationSuccess };
     use reqwest::header;
 
     pub fn run(global: &clap::ArgMatches, params: &clap::ArgMatches, user_opt: Option<User>)
@@ -262,15 +262,32 @@ pub mod projection {
                 CerberusError::UserFault(
                     "Your current user cannot create a projection.".to_owned()));
         } else if resp_status == 409 {
+            let msg = resp.text().unwrap_or("<unreadable text message>".to_owned());
+
             return Err(
                 CerberusError::UserFault(
-                    format!("Conflict Error: {}", resp.text().unwrap())));
+                    format!("Conflict Error: {}", msg)));
         }
 
-        let result: crate::common::ProjectionCreationSuccess = resp.json().unwrap();
+        let result: reqwest::Result<ProjectionCreationSuccess> = resp.json();
 
-        println!("Projection [{}] created", result.name);
+        match result {
+            Err(e) => {
+                let msg = resp.text().unwrap_or("<unreadable text message>".to_owned());
 
-        Ok(())
+                Err(
+                    CerberusError::DevFault(
+                        format!(
+                            "We were unable to deserialize ProjectionCreationSuccess \
+                            out of a projection creation response. Status {}, \
+                            response body [{}], Error: {}", resp_status, msg, e)))
+            },
+
+            Ok(result) => {
+                println!("Projection [{}] created", result.name);
+
+                Ok(())
+            },
+        }
     }
 }

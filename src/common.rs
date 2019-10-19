@@ -73,6 +73,7 @@ pub struct ProjectionCreationSuccess {
 #[derive(Debug)]
 pub enum CerberusError {
     UserFault(String),
+    DevFault(String),
 }
 
 impl Error for CerberusError {}
@@ -81,7 +82,15 @@ impl fmt::Display for CerberusError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             CerberusError::UserFault(msg) =>
-                write!(f, "{}", msg)
+                write!(f, "{}", msg),
+
+            CerberusError::DevFault(msg) => {
+                writeln!(f,
+                    "You encountered an application unexpected error. Please \
+                    report an issue there https://github.com/YoEight/cerberus/issues/new:")?;
+
+                write!(f, "Unexpected error >>= {}", msg)
+            },
         }
     }
 }
