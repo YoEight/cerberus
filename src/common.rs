@@ -178,3 +178,32 @@ pub fn create_node_uri(params: &clap::ArgMatches)
 
     format!("http://{}:{}", host, port)
 }
+
+pub mod http {
+    use crate::common::{ CerberusError, CerberusResult };
+
+    pub fn default_client_fault(mut resp: reqwest::Response) -> CerberusResult<()>
+    {
+        let msg = resp.text().unwrap_or("<unreadable text message>".to_owned());
+
+        Err(
+            CerberusError::UserFault(
+                format!("User error: {}", msg)))
+    }
+
+    pub fn default_server_fault(mut resp: reqwest::Response) -> CerberusResult<()>
+    {
+        let msg = resp.text().unwrap_or("<unreadable text message>".to_owned());
+
+        Err(
+            CerberusError::UserFault(
+                format!("Server error: [{}] {}", resp.status(), msg)))
+    }
+
+    pub fn default_unexpected(resp: reqwest::Response) -> CerberusResult<()>
+    {
+        Err(
+            CerberusError::DevFault(
+                format!("{:?}", resp)))
+    }
+}
