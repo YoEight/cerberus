@@ -70,6 +70,16 @@ pub struct ProjectionCreationSuccess {
     pub name: String,
 }
 
+#[derive(Serialize, Deserialize, Debug)]
+pub struct CroppedProjectionInfo {
+    pub status: String,
+
+    /// In case of a 'Faulted' status, gives an insight of what
+    /// wrong happened.
+    #[serde(rename = "stateReason")]
+    pub reason: Option<String>,
+}
+
 #[derive(Debug)]
 pub enum CerberusError {
     UserFault(String),

@@ -255,8 +255,6 @@ pub mod projection {
                 format!("Failed to create a projection: {}", e))
         })?;
 
-        let resp_status = resp.status().as_u16();
-
         if resp.status().is_success() {
             let result: reqwest::Result<ProjectionCreationSuccess> = resp.json();
 
@@ -269,12 +267,40 @@ pub mod projection {
                             format!(
                                 "We were unable to deserialize ProjectionCreationSuccess \
                                 out of a projection creation response. Status {}, \
-                                response body [{}], Error: {}", resp_status, msg, e)));
+                                response body [{}], Error: {}", resp.status().as_u16(), msg, e)));
                 },
 
                 Ok(result) => {
-                    println!("Projection [{}] created", result.name);
+                    let mut req = reqwest::Client::new()
+                        .get(&format!("{}/projection/{}", base_url, result.name));
 
+                    if let Some(user) = user_opt.as_ref() {
+                        req = req.basic_auth(user.login, user.password);
+                    }
+
+                    let mut resp = req.send().map_err(|e|
+                    {
+                        CerberusError::DevFault(
+                            format!("Failed to read projection info: {}", e))
+                    })?;
+
+                    let info: crate::common::CroppedProjectionInfo = resp.json().map_err(|e|
+                    {
+                        CerberusError::DevFault(
+                            format!(
+                                "We were unable to deserialize CroppedProjectionInfo out \
+                                of projection info request: [{}] {:?}", e, resp))
+                    })?;
+
+                    if info.status == "Faulted" {
+                        let reason = info.reason.unwrap_or("<unavailable faulted reason>".to_owned());
+
+                        return Err(
+                            CerberusError::UserFault(
+                                format!("Unsuccessful projection [{}] creation:\n>> {}", result.name, reason)));
+                    }
+
+                    println!("Projection [{}] created", result.name);
                     return Ok(());
                 },
             }
