@@ -4,6 +4,7 @@ use std::error::Error;
 use std::fmt;
 use std::net::{ SocketAddr, ToSocketAddrs };
 
+#[derive(Debug, Copy, Clone)]
 pub struct User<'a> {
     pub login: &'a str,
     pub password: Option<&'a str>,
@@ -255,33 +256,4 @@ pub fn public_http_port(global: &clap::ArgMatches) -> u16
         .unwrap_or(vec!["2113".to_owned()]);
 
     ports.pop().unwrap().parse().unwrap()
-}
-
-pub mod http {
-    use crate::common::{ CerberusError, CerberusResult };
-
-    pub fn default_client_fault(mut resp: reqwest::Response) -> CerberusResult<()>
-    {
-        let msg = resp.text().unwrap_or("<unreadable text message>".to_owned());
-
-        Err(
-            CerberusError::UserFault(
-                format!("User error: {}", msg)))
-    }
-
-    pub fn default_server_fault(mut resp: reqwest::Response) -> CerberusResult<()>
-    {
-        let msg = resp.text().unwrap_or("<unreadable text message>".to_owned());
-
-        Err(
-            CerberusError::UserFault(
-                format!("Server error: [{}] {}", resp.status(), msg)))
-    }
-
-    pub fn default_unexpected(resp: reqwest::Response) -> CerberusResult<()>
-    {
-        Err(
-            CerberusError::DevFault(
-                format!("{:?}", resp)))
-    }
 }

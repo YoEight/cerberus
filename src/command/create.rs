@@ -210,122 +210,50 @@ pub mod subscription {
 }
 
 pub mod projection {
-    use crate::common::{ CerberusError, CerberusResult, User, ProjectionCreationSuccess, http };
-    use reqwest::header;
+    use crate::common::{
+        CerberusError,
+        CerberusResult,
+    };
 
-    pub fn run(global: &clap::ArgMatches, params: &clap::ArgMatches, user_opt: Option<User>)
-        -> CerberusResult<()>
-    {
-        let base_url = crate::common::create_node_uri(global);
-        let kind = params.value_of("kind").expect("Kind was check by clap already");
-        let enabled = format!("{}", params.is_present("enabled"));
-        let emit = format!("{}", params.is_present("emit"));
-        let checkpoints = format!("{}", params.is_present("checkpoints"));
+    use crate::api::{
+        Api,
+        ProjectionConf,
+    };
+
+    pub fn run(
+        _: &clap::ArgMatches,
+        params: &clap::ArgMatches,
+        api: Api,
+    ) -> CerberusResult<()> {
         let script_filepath = params.value_of("SCRIPT").expect("SCRIPT was check by clap already");
-
         let script = std::fs::read_to_string(script_filepath).map_err(|e|
         {
             CerberusError::UserFault(
                 format!("There was an issue with the script's filepath you submitted: {}", e))
         })?;
 
-        let mut query = vec![
-            ("enabled", enabled.as_str()),
-            ("emit", emit.as_str()),
-            ("checkoints", checkpoints.as_str()),
-            ("type", "JS")
-        ];
+        let conf = ProjectionConf {
+            name: params.value_of("name"),
+            kind: params.value_of("kind").expect("Kind was check by clap already"),
+            enabled: params.is_present("enabled"),
+            emit: params.is_present("emit"),
+            checkpoints: params.is_present("checkpoints"),
+            script,
+        };
 
-        if let Some(name) = params.value_of("name") {
-            query.push(("name", name));
+        let result = api.create_projection(conf)?;
+        let info = api.projection_cropped_info(&result.name)?;
+
+        if info.status == "Faulted" {
+            let reason = info.reason.unwrap_or("<unavailable faulted reason>".to_owned());
+
+            return Err(
+                CerberusError::UserFault(
+                    format!("Unsuccessful projection [{}] creation:\n>> {}", result.name, reason)));
         }
 
-        let mut req = reqwest::Client::new()
-            .post(&format!("{}/projections/{}", base_url, kind))
-            .header(header::CONTENT_TYPE, "application/json;charset=UTF-8")
-            .query(&query)
-            .body(script);
+        println!("Projection [{}] created", result.name);
 
-        if let Some(user) = user_opt.as_ref() {
-            req = req.basic_auth(user.login, user.password);
-        }
-
-        let mut resp = req.send().map_err(|e| {
-            CerberusError::UserFault(
-                format!("Failed to create a projection: {}", e))
-        })?;
-
-        if resp.status().is_success() {
-            let result: reqwest::Result<ProjectionCreationSuccess> = resp.json();
-
-            match result {
-                Err(e) => {
-                    let msg = resp.text().unwrap_or("<unreadable text message>".to_owned());
-
-                    return Err(
-                        CerberusError::DevFault(
-                            format!(
-                                "We were unable to deserialize ProjectionCreationSuccess \
-                                out of a projection creation response. Status {}, \
-                                response body [{}], Error: {}", resp.status().as_u16(), msg, e)));
-                },
-
-                Ok(result) => {
-                    let mut req = reqwest::Client::new()
-                        .get(&format!("{}/projection/{}", base_url, result.name));
-
-                    if let Some(user) = user_opt.as_ref() {
-                        req = req.basic_auth(user.login, user.password);
-                    }
-
-                    let mut resp = req.send().map_err(|e|
-                    {
-                        CerberusError::DevFault(
-                            format!("Failed to read projection info: {}", e))
-                    })?;
-
-                    let info: crate::common::CroppedProjectionInfo = resp.json().map_err(|e|
-                    {
-                        CerberusError::DevFault(
-                            format!(
-                                "We were unable to deserialize CroppedProjectionInfo out \
-                                of projection info request: [{}] {:?}", e, resp))
-                    })?;
-
-                    if info.status == "Faulted" {
-                        let reason = info.reason.unwrap_or("<unavailable faulted reason>".to_owned());
-
-                        return Err(
-                            CerberusError::UserFault(
-                                format!("Unsuccessful projection [{}] creation:\n>> {}", result.name, reason)));
-                    }
-
-                    println!("Projection [{}] created", result.name);
-                    return Ok(());
-                },
-            }
-        }
-
-        if resp.status().is_client_error() {
-            if resp.status() == reqwest::StatusCode::UNAUTHORIZED {
-                return Err(
-                    CerberusError::UserFault(
-                        "Your current user cannot create a projection.".to_owned()));
-            } else if resp.status() == reqwest::StatusCode::CONFLICT {
-                let msg = resp.text().unwrap_or("<unreadable text message>".to_owned());
-
-                return Err(
-                    CerberusError::UserFault(
-                        format!("Conflict Error: {}", msg)));
-            }
-
-            return http::default_client_fault(resp);
-        }
-
-        if resp.status().is_server_error() {
-            return http::default_server_fault(resp);
-        }
-
-        http::default_unexpected(resp)
+        Ok(())
     }
 }

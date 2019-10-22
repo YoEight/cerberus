@@ -1,3 +1,4 @@
+mod api;
 mod command;
 mod common;
 
@@ -30,8 +31,7 @@ fn main()
         .arg(Arg::with_name("tcp-port")
             .help("A node TCP port [default: 1113]")
             .value_name("PORT")
-            .long("tcp-port")
-            .takes_value(true))
+            .long("tcp-port") .takes_value(true))
         .arg(Arg::with_name("http-port")
             .help("A node HTTP port [default: 2113]")
             .value_name("PORT")
@@ -302,6 +302,8 @@ fn main()
         .get_matches();
 
     let user_opt = common::User::from_args(&matches);
+    let base_url = common::create_node_uri(&matches);
+    let api = api::Api::new(&base_url, user_opt);
 
     let result = {
         if let Some(params) = matches.subcommand_matches("check") {
@@ -339,7 +341,7 @@ fn main()
         } else if let Some(params) = matches.subcommand_matches("delete-subscription") {
             command::delete::subscription::run(&matches, params, user_opt)
         } else if let Some(params) = matches.subcommand_matches("create-projection") {
-            command::create::projection::run(&matches, params, user_opt)
+            command::create::projection::run(&matches, params, api)
         } else if let Some(params) = matches.subcommand_matches("list-projections") {
             command::list::projections::run(&matches, params, user_opt)
         } else {
