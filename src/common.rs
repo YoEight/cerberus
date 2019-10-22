@@ -91,6 +91,37 @@ pub struct CroppedProjectionInfo {
     pub reason: Option<String>,
 }
 
+#[derive(Serialize, Deserialize, Debug)]
+pub struct ClusterMembers {
+    pub members: Vec<ClusterMember>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct ClusterMember {
+    #[serde(rename = "externalTcpIp")]
+    pub external_tcp_ip: String,
+
+    #[serde(rename = "externalHttpIp")]
+    pub external_http_ip: String,
+
+    #[serde(rename = "externalTcpPort")]
+    pub external_tcp_port: u16,
+
+    #[serde(rename = "externalHttpPort")]
+    pub external_http_port: u16,
+
+    #[serde(rename = "internalTcpPort")]
+    pub internal_tcp_port: u16,
+
+    #[serde(rename = "internalHttpPort")]
+    pub internal_http_port: u16,
+
+    pub state: String,
+
+    #[serde(rename = "isAlive")]
+    pub is_alive: bool,
+}
+
 #[derive(Debug)]
 pub enum CerberusError {
     UserFault(String),
