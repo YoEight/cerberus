@@ -28,6 +28,17 @@ impl<'a> User<'a> {
 }
 
 #[derive(Serialize, Deserialize)]
+pub struct NodeInfo {
+    #[serde(rename = "esVersion")]
+    pub version: String,
+
+    pub state: String,
+
+    #[serde(rename = "projectionsMode")]
+    pub projections_mode: String,
+}
+
+#[derive(Serialize, Deserialize)]
 pub struct SubscriptionSummary {
     #[serde(rename = "eventStreamId")]
     pub event_stream_id: String,
@@ -187,6 +198,32 @@ pub fn create_node_uri(params: &clap::ArgMatches)
     let port = ports.pop().unwrap();
 
     format!("http://{}:{}", host, port)
+}
+
+pub fn node_host<'a>(global: &'a clap::ArgMatches) -> &'a str {
+    if let Some(mut hosts) = global.values_of("host") {
+        hosts.next().unwrap_or("localhost")
+    } else {
+        "localhost"
+    }
+}
+
+pub fn public_tcp_port(global: &clap::ArgMatches) -> u16
+{
+
+    let mut ports = global.values_of_lossy("tcp-port")
+        .unwrap_or(vec!["1113".to_owned()]);
+
+    ports.pop().unwrap().parse().unwrap()
+}
+
+pub fn public_http_port(global: &clap::ArgMatches) -> u16
+{
+
+    let mut ports = global.values_of_lossy("http-port")
+        .unwrap_or(vec!["2113".to_owned()]);
+
+    ports.pop().unwrap().parse().unwrap()
 }
 
 pub mod http {
