@@ -5,7 +5,8 @@ use crate::common::{
 };
 
 pub struct Api<'a> {
-    base_url: &'a str,
+    host: &'a str,
+    port: u16,
     client: reqwest::Client,
 }
 
@@ -16,6 +17,12 @@ pub struct ProjectionConf<'a> {
     pub emit: bool,
     pub checkpoints: bool,
     pub script: String,
+}
+
+pub enum ClusterState {
+    Cluster(common::ClusterMembers),
+    ProblematicClusterNode,
+    NoCluster,
 }
 
 fn default_error_handler<A>(mut resp: reqwest::Response) -> CerberusResult<A> {
@@ -48,7 +55,8 @@ fn default_error_handler<A>(mut resp: reqwest::Response) -> CerberusResult<A> {
 
 impl<'a> Api<'a> {
     pub fn new(
-        base_url: &'a str,
+        host: &'a str,
+        port: u16,
         user_opt: Option<common::User>,
     ) -> Api<'a> {
         let mut builder = reqwest::Client::builder();
@@ -68,17 +76,28 @@ impl<'a> Api<'a> {
         }
 
         Api {
-            base_url,
+            host,
+            port,
             client: builder.build().unwrap(),
         }
     }
 
-    pub fn with_different_base_url<'b>(
+    pub fn host(&self) -> &str {
+        self.host
+    }
+
+    pub fn port(&self) -> u16 {
+        self.port
+    }
+
+    pub fn with_different_node<'b>(
         &self,
-        base_url: &'b str,
+        host: &'b str,
+        port: u16,
     ) -> Api<'b> {
         Api {
-            base_url,
+            host,
+            port,
             client: self.client.clone(),
         }
     }
@@ -104,7 +123,7 @@ impl<'a> Api<'a> {
         }
 
         let req = self.client
-            .post(&format!("{}/projections/{}", self.base_url, conf.kind))
+            .post(&format!("http://{}:{}/projections/{}", self.host, self.port, conf.kind))
             .header(reqwest::header::CONTENT_TYPE, "application/json;charset=UTF-8")
             .query(&query)
             .body(conf.script);
@@ -134,7 +153,7 @@ impl<'a> Api<'a> {
         projection_name: &str,
     ) -> CerberusResult<common::CroppedProjectionInfo> {
         let req = self.client
-            .get(&format!("{}/projection/{}", self.base_url, projection_name));
+            .get(&format!("http://{}:{}/projection/{}", self.host, self.port, projection_name));
 
         let mut resp = req.send().map_err(|e| {
             CerberusError::UserFault(
@@ -148,6 +167,54 @@ impl<'a> Api<'a> {
                         "We were unable to deserialize CroppedProjectionInfo out \
                         of projection info request: [{}] {:?}", e, resp))
             });
+        }
+
+        default_error_handler(resp)
+    }
+
+    pub fn node_info(&self) -> CerberusResult<common::NodeInfo> {
+        let req = self.client
+            .get(&format!("http://{}:{}/info?format=json", self.host, self.port));
+
+        let mut resp = req.send().map_err(|e|
+            CerberusError::UserFault(
+                format!("Unable to connect to node {}:{}: {}", self.host, self.port, e))
+        )?;
+
+        if resp.status().is_success() {
+            return resp.json().map_err(|e|
+                CerberusError::DevFault(
+                    format!("Failed to parse NodeInfo: {}", e))
+            );
+        }
+
+        default_error_handler(resp)
+    }
+
+    pub fn gossip(&self) -> CerberusResult<ClusterState> {
+        let req = reqwest::Client::new()
+        .get(&format!("http://{}:{}/gossip?format=json", self.host, self.port));
+
+        let mut resp = req.send().map_err(|e|
+            CerberusError::UserFault(
+                format!("Unable to connect to node {}:{}: {}", self.host, self.port, e))
+        )?;
+
+        if resp.status().is_success() {
+            let members = resp.json().map_err(|e|
+                CerberusError::DevFault(
+                    format!("Failed to deserialize ClusterMembers object: {}", e))
+            )?;
+
+            return Ok(ClusterState::Cluster(members));
+        }
+
+        if resp.status().is_client_error() {
+            return Ok(ClusterState::NoCluster);
+        }
+
+        if resp.status().is_server_error() {
+            return Ok(ClusterState::ProblematicClusterNode);
         }
 
         default_error_handler(resp)

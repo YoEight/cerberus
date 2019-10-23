@@ -39,7 +39,10 @@ fn main()
             .takes_value(true)
             .multiple(true))
         .subcommand(SubCommand::with_name("check")
-            .about("Check if a database setup is reachable"))
+            .about("Check if a database setup is reachable")
+            .arg(Arg::with_name("no-cluster-check")
+                .help("Discard cluster connection health-check")
+                .long("no-cluster-check")))
         .subcommand(SubCommand::with_name("list")
             .about("List database entities")
             .arg(Arg::with_name("ENTITY")
@@ -302,12 +305,13 @@ fn main()
         .get_matches();
 
     let user_opt = common::User::from_args(&matches);
-    let base_url = common::create_node_uri(&matches);
-    let api = api::Api::new(&base_url, user_opt);
+    let host = crate::common::node_host(&matches);
+    let http_port = crate::common::public_http_port(&matches);
+    let api = api::Api::new(host, http_port, user_opt);
 
     let result = {
         if let Some(params) = matches.subcommand_matches("check") {
-            command::check::run(&matches, params)
+            command::check::run(&matches, params, api)
         } else if let Some(params) = matches.subcommand_matches("list") {
             let entity = params.value_of("ENTITY")
                 .expect("Already checked by Clap that entity isn't empty");
