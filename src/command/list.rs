@@ -188,32 +188,16 @@ pub mod streams {
 }
 
 pub mod subscriptions {
-    use crate::common::{ CerberusResult, CerberusError, User };
+    use crate::common::CerberusResult;
+    use crate::api::Api;
 
-    pub fn run(global: &clap::ArgMatches, params: &clap::ArgMatches, user_opt: Option<User>)
-        -> CerberusResult<()>
-    {
-        let base_url = crate::common::create_node_uri(global);
-
-        let mut req = reqwest::Client::new()
-            .get(&format!("{}/subscriptions", base_url));
-
-        if let Some(user) = user_opt {
-            req = req.basic_auth(user.login, user.password);
-        }
-
-        let mut resp = req.send().map_err(|e|
-        {
-            CerberusError::UserFault(
-                format!("Failed to list persistent subscriptions: {}", e))
-        })?;
-
+    pub fn run(
+        _: &clap::ArgMatches,
+        params: &clap::ArgMatches,
+        api: Api,
+    ) -> CerberusResult<()> {
         if params.is_present("raw") {
-            let subs: Vec<serde_json::value::Value> = resp.json().map_err(|e|
-            {
-                CerberusError::UserFault(
-                    format!("Failed to deserialize SubscriptionSummary: {}", e))
-            })?;
+            let subs = api.subscriptions_raw()?;
 
             for sub in subs {
                 println!("--------------------------------------------------------------");
@@ -221,11 +205,7 @@ pub mod subscriptions {
                 println!();
             }
         } else {
-            let subs: Vec<crate::common::SubscriptionSummary> = resp.json().map_err(|e|
-            {
-                CerberusError::UserFault(
-                    format!("Failed to deserialize SubscriptionSummary: {}", e))
-            })?;
+            let subs = api.subscriptions()?;
 
             for sub in subs {
                 let process_diff = sub.last_known_event_number - sub.last_processed_event_number;

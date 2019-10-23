@@ -2,6 +2,7 @@ use crate::common::{
     self,
     CerberusResult,
     CerberusError,
+    SubscriptionSummary,
 };
 
 pub struct Api<'a> {
@@ -51,6 +52,14 @@ fn default_error_handler<A>(mut resp: reqwest::Response) -> CerberusResult<A> {
     Err(
         CerberusError::DevFault(
             format!("{:?}", resp)))
+}
+
+fn default_connection_error(
+    api: &Api,
+    error: reqwest::Error,
+) -> CerberusError {
+    CerberusError::UserFault(
+        format!("Unable to connect to node {}:{}: {}", api.host(), api.port(), error))
 }
 
 impl<'a> Api<'a> {
@@ -196,8 +205,7 @@ impl<'a> Api<'a> {
         .get(&format!("http://{}:{}/gossip?format=json", self.host, self.port));
 
         let mut resp = req.send().map_err(|e|
-            CerberusError::UserFault(
-                format!("Unable to connect to node {}:{}: {}", self.host, self.port, e))
+            default_connection_error(self, e)
         )?;
 
         if resp.status().is_success() {
@@ -218,5 +226,33 @@ impl<'a> Api<'a> {
         }
 
         default_error_handler(resp)
+    }
+
+    pub fn subscriptions(&self) -> CerberusResult<Vec<SubscriptionSummary>> {
+        let req = self.client
+            .get(&format!("http://{}:{}/subscriptions", self.host(), self.port()));
+
+        let mut resp = req.send().map_err(|e|
+            default_connection_error(self, e)
+        )?;
+
+        return resp.json().map_err(|e|
+            CerberusError::UserFault(
+                format!("Failed to deserialize SubscriptionSummary: {}", e))
+        );
+    }
+
+    pub fn subscriptions_raw(&self) -> CerberusResult<Vec<serde_json::value::Value>> {
+        let req = self.client
+            .get(&format!("http://{}:{}/subscriptions", self.host(), self.port()));
+
+        let mut resp = req.send().map_err(|e|
+            default_connection_error(self, e)
+        )?;
+
+        return resp.json().map_err(|e|
+            CerberusError::UserFault(
+                format!("Failed to deserialize SubscriptionSummary: {}", e))
+        );
     }
 }

@@ -326,7 +326,7 @@ fn main()
                 },
 
                 "subscriptions" => {
-                    command::list::subscriptions::run(&matches, params, user_opt)
+                    command::list::subscriptions::run(&matches, params, api)
                 },
 
                 "subscription" => {
