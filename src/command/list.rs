@@ -4,48 +4,53 @@ pub mod events {
     use futures::future::Future;
     use futures::stream::Stream;
 
-    fn get_stream_name(original_stream_name: &str, params: &clap::ArgMatches) -> String
-    {
-        if let Some(group_id) = params.value_of("group-id") {
-            if params.is_present("checkpoint") {
-                format!("$persistentsubscription-{}::{}-checkpoint", original_stream_name, group_id)
+    fn get_stream_name(params: &clap::ArgMatches) -> CerberusResult<String> {
+        if let Some(original_stream_name) = params.value_of("stream") {
+            if let Some(group_id) = params.value_of("group-id") {
+                if params.is_present("checkpoint") {
+                    Ok(format!("$persistentsubscription-{}::{}-checkpoint", original_stream_name, group_id))
+                } else {
+                    Ok(format!("$persistentsubscription-{}::{}-parked", original_stream_name, group_id))
+                }
             } else {
-                format!("$persistentsubscription-{}::{}-parked", original_stream_name, group_id)
+                Ok(original_stream_name.to_owned())
             }
+        } else if let Some(tpe) = params.value_of("by-type") {
+            Ok(format!("$et-{}", tpe))
         } else {
-            original_stream_name.to_owned()
+            Err(CerberusError::UserFault(
+                "You must at least use --stream or --by-type parameters".to_owned()))
         }
     }
 
-    pub fn run(global: &clap::ArgMatches, params: &clap::ArgMatches)
-        -> CerberusResult<()>
-    {
+    pub fn run(
+        global: &clap::ArgMatches,
+        params: &clap::ArgMatches,
+    ) -> CerberusResult<()> {
         let connection = crate::common::create_connection_default(global)?;
 
-        if let Some(original_stream_name) = params.value_of("stream") {
-            let command = connection
-                .read_stream(get_stream_name(original_stream_name, params))
-                .resolve_link_tos(eventstore::LinkTos::ResolveLink);
+        let stream_name = get_stream_name(params)?;
+        let command = connection
+            .read_stream(stream_name)
+            .resolve_link_tos(eventstore::LinkTos::ResolveLink);
 
-            let stream: Box<dyn Stream<Item=ResolvedEvent, Error=OperationError>> =
-                if params.is_present("recent") {
-                    // We also force `max_count` to 50 because there is no need
-                    // asking the server to load more than that.
-                    let stream = command
-                        .max_count(50)
-                        .start_from_end_of_stream()
-                        .iterate_over()
-                        .take(50);
+        let stream: Box<dyn Stream<Item=ResolvedEvent, Error=OperationError>> =
+            if params.is_present("recent") {
+                // We also force `max_count` to 50 because there is no need
+                // asking the server to load more than that.
+                let stream = command
+                    .max_count(50)
+                    .start_from_end_of_stream()
+                    .iterate_over()
+                    .take(50);
 
-                    Box::new(stream)
-                } else {
-                    Box::new(command.iterate_over())
-                };
+                Box::new(stream)
+            } else {
+                Box::new(command.iterate_over())
+            };
 
-            let result = stream.for_each(|event|
-            {
-                let record = event.event.expect("Event field would be always defined in this situation");
-
+        let result = stream.for_each(|event| {
+            if let Some(record) = event.event {
                 println!("--------------------------------------------------------------");
                 println!("Number: {}", record.event_number);
                 println!("Stream: {}", record.event_stream_id);
@@ -72,22 +77,31 @@ pub mod events {
                 } else {
                     println!("Payload: <raw bytes we don't know how to deal with>");
                 }
-
-
-                Ok(())
-            }).wait();
-
-            if let Err(e) = result {
-                Err(
-                    CerberusError::UserFault(
-                        format!("Exception happened when streaming the stream (huhuh): {}", e)))
             } else {
-                Ok(())
+                let link = event.link.expect("Link field would be always defined in this situation");
+
+                unsafe {
+                    let content = std::str::from_utf8_unchecked(&link.data);
+
+                    println!("--------------------------------------------------------------");
+                    println!("[DELETED: Only the link is available]");
+                    println!("Number: {}", link.event_number);
+                    println!("Stream: {}", link.event_stream_id);
+                    println!("Type: {}", link.event_type);
+                    println!("Payload: {}", content);
+                }
             }
-        } else {
+
+
+            Ok(())
+        }).wait();
+
+        if let Err(e) = result {
             Err(
                 CerberusError::UserFault(
-                    "You didn't supply --stream option".to_owned()))
+                    format!("Exception happened when streaming the stream (huhuh): {}", e)))
+        } else {
+            Ok(())
         }
     }
 }

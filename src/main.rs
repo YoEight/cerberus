@@ -78,6 +78,35 @@ fn main()
             .arg(Arg::with_name("raw")
                 .help("For subscription(s) entities, show as much data as the server provides")
                 .long("raw")))
+        .subcommand(SubCommand::with_name("list-events")
+            .about("List stream events")
+            .arg(Arg::with_name("stream")
+                .help("For events and subscription entities, represents a stream's name")
+                .short("s")
+                .long("stream")
+                .value_name("STREAM_NAME")
+                .takes_value(true))
+            .arg(Arg::with_name("group-id")
+                .help(
+                    "Represents a persistent subscription's group-id. Can be used with \
+                    --stream parameter to get a persistent subscription parked messages \
+                    events")
+                .long("group-id")
+                .value_name("GROUP_ID")
+                .takes_value(true))
+            .arg(Arg::with_name("checkpoint")
+                .help(
+                    "When --stream and --group-id are used, will give a persistent \
+                    subscription's last persisted checkpoint")
+                .long("checkpoint"))
+            .arg(Arg::with_name("by-type")
+                .help("Targets events of a given type")
+                .long("by-type")
+                .value_name("Type")
+                .takes_value(true))
+            .arg(Arg::with_name("recent")
+                .help("For streams and events entities, takes the recent 50 entries")
+                .long("recent")))
         .subcommand(SubCommand::with_name("list-subscription")
             .about("List a persistent subscription information")
             .arg(Arg::with_name("stream")
@@ -337,10 +366,6 @@ fn main()
                 .expect("Already checked by Clap that entity isn't empty");
 
             match entity {
-                "events" => {
-                    command::list::events::run(&matches, params)
-                },
-
                 "streams" => {
                     command::list::streams::run(&matches, params)
                 },
@@ -350,6 +375,8 @@ fn main()
                         common::CerberusError::UserFault(
                             format!("Listing [{}] entity is not supported yet", ignored))),
             }
+        } else if let Some(params) = matches.subcommand_matches("list-events") {
+            command::list::events::run(&matches, params)
         } else if let Some(params) = matches.subcommand_matches("list-subscriptions") {
             command::list::subscriptions::run(&matches, params, api)
         } else if let Some(params) = matches.subcommand_matches("list-subscription") {
