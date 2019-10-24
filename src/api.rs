@@ -3,6 +3,8 @@ use crate::common::{
     CerberusResult,
     CerberusError,
     SubscriptionSummary,
+    Projections,
+    Projection,
 };
 
 pub struct Api<'a> {
@@ -275,5 +277,28 @@ impl<'a> Api<'a> {
             CerberusError::UserFault(
                 format!("Failed to deserialize SubscriptionSummary: {}", e))
         );
+    }
+
+    pub fn projections(
+        &self,
+        kind: &str,
+    ) -> CerberusResult<Vec<Projection>> {
+        let req = self.client
+            .get(&format!("http://{}:{}/projections/{}", self.host, self.port, kind));
+
+        let mut resp = req.send().map_err(|e|
+            default_connection_error(self, e)
+        )?;
+
+        if resp.status().is_success() {
+            let result: Projections = resp.json().map_err(|e|
+                CerberusError::DevFault(
+                    format!("Failed to deserialize Projections: {}", e))
+            )?;
+
+            return Ok(result.projections);
+        }
+
+        default_error_handler(resp)
     }
 }

@@ -215,23 +215,6 @@ pub fn create_connection_default(params: &clap::ArgMatches)
     create_connection(params, |b| b)
 }
 
-// TODO - Not sure what strategy we should pick in case of a cluster.
-// Do we try to pick the elected node first?
-pub fn create_node_uri(params: &clap::ArgMatches)
-    -> String
-{
-    let mut hosts = params.values_of_lossy("host")
-        .unwrap_or(vec!["localhost".to_owned()]);
-
-    let mut ports = params.values_of_lossy("http-port")
-        .unwrap_or(vec!["2113".to_owned()]);
-
-    let host = hosts.pop().unwrap();
-    let port = ports.pop().unwrap();
-
-    format!("http://{}:{}", host, port)
-}
-
 pub fn node_host<'a>(global: &'a clap::ArgMatches) -> &'a str {
     if let Some(mut hosts) = global.values_of("host") {
         hosts.next().unwrap_or("localhost")

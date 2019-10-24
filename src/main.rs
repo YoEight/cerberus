@@ -363,7 +363,7 @@ fn main()
         } else if let Some(params) = matches.subcommand_matches("create-projection") {
             command::create::projection::run(&matches, params, api)
         } else if let Some(params) = matches.subcommand_matches("list-projections") {
-            command::list::projections::run(&matches, params, user_opt)
+            command::list::projections::run(&matches, params, api)
         } else {
             Ok(())
         }

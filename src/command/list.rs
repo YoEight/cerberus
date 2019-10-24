@@ -244,7 +244,8 @@ pub mod subscription {
 }
 
 pub mod projections {
-    use crate::common::{ CerberusResult, CerberusError, User, Projections };
+    use crate::common::{ CerberusResult, CerberusError };
+    use crate::api::Api;
 
     const KINDS: &[&str] = &[
         "any",
@@ -254,21 +255,15 @@ pub mod projections {
         "all-non-transient"
     ];
 
-    fn is_valid_kind(submitted: &str) -> bool
-    {
-        for kind in KINDS {
-            if submitted == *kind {
-                return true;
-            }
-        }
-
-        false
+    fn is_valid_kind(submitted: &str) -> bool {
+        KINDS.iter().any(|kind| submitted == *kind)
     }
 
-    pub fn run(global: &clap::ArgMatches, params: &clap::ArgMatches, user_opt: Option<User>)
-        -> CerberusResult<()>
-    {
-        let base_url = crate::common::create_node_uri(global);
+    pub fn run(
+        _: &clap::ArgMatches,
+        params: &clap::ArgMatches,
+        api: Api,
+    ) -> CerberusResult<()> {
         let kind = params.value_of("kind").unwrap_or("any");
 
         if !is_valid_kind(kind) {
@@ -277,28 +272,9 @@ pub mod projections {
                     format!("Invalid kind value [{}]. Possible values: {:?}", kind, KINDS)));
         }
 
-        let mut req = reqwest::Client::new()
-            .get(&format!("{}/projections/{}", base_url, kind));
+        let projections = api.projections(kind)?;
 
-        if let Some(user) = user_opt {
-            req = req.basic_auth(user.login, user.password);
-        }
-
-        let mut resp = req.send().map_err(|e|
-        {
-            CerberusError::UserFault(
-                format!("Failed to list projection: {}", e))
-        })?;
-
-        if resp.status().as_u16() == 401 {
-            return Err(
-                CerberusError::UserFault(
-                    "Your current user cannot list projections.".to_owned()));
-        }
-
-        let result: Projections = resp.json().unwrap();
-
-        for proj in result.projections {
+        for proj in projections {
             println!("{} [mode: {}] [status: {}]", proj.name, proj.mode, proj.status);
         }
 
