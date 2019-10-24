@@ -225,47 +225,21 @@ pub mod subscriptions {
 }
 
 pub mod subscription {
-    use crate::common::{ CerberusResult, CerberusError, User };
+    use crate::common::CerberusResult;
+    use crate::api::Api;
 
-    pub fn run(global: &clap::ArgMatches, params: &clap::ArgMatches, user_opt: Option<User>)
-        -> CerberusResult<()>
-    {
-        let base_url = crate::common::create_node_uri(global);
-        let persistent_sub = params.value_of("stream").and_then(|stream|
-        {
-            params.value_of("group-id").map(|group_id| (stream, group_id))
-        });
+    pub fn run(
+        _: &clap::ArgMatches,
+        params: &clap::ArgMatches,
+        api: Api,
+    ) -> CerberusResult<()> {
+        let stream = params.value_of("stream").expect("Already checked by Clap");
+        let group_id = params.value_of("group-id").expect("Already checked by Clap");
+        let sub = api.subscription_raw(stream, group_id)?;
 
-        if let Some((stream, group_id)) = persistent_sub {
-            let mut req = reqwest::Client::new()
-                .get(&format!("{}/subscriptions/{}/{}/info", base_url, stream, group_id));
+        serde_json::to_writer_pretty(std::io::stdout(), &sub).unwrap();
 
-            if let Some(user) = user_opt {
-                req = req.basic_auth(user.login, user.password);
-            }
-
-            let mut resp = req.send().map_err(|e|
-            {
-                CerberusError::UserFault(
-                    format!("Failed to list persistent subscriptions: {}", e))
-            })?;
-
-            let sub: serde_json::value::Value = resp.json().map_err(|e|
-            {
-                CerberusError::UserFault(
-                    format!("Failed to deserialize SubscriptionSummary: {}", e))
-            })?;
-
-            println!("--------------------------------------------------------------");
-            serde_json::to_writer_pretty(std::io::stdout(), &sub).unwrap();
-            println!();
-
-            Ok(())
-        } else {
-            Err(
-                CerberusError::UserFault(
-                    "You didn't provide --stream and --group-id parameters.".to_owned()))
-        }
+        Ok(())
     }
 }
 

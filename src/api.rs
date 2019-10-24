@@ -237,7 +237,7 @@ impl<'a> Api<'a> {
         )?;
 
         return resp.json().map_err(|e|
-            CerberusError::UserFault(
+            CerberusError::DevFault(
                 format!("Failed to deserialize SubscriptionSummary: {}", e))
         );
     }
@@ -245,6 +245,27 @@ impl<'a> Api<'a> {
     pub fn subscriptions_raw(&self) -> CerberusResult<Vec<serde_json::value::Value>> {
         let req = self.client
             .get(&format!("http://{}:{}/subscriptions", self.host(), self.port()));
+
+        let mut resp = req.send().map_err(|e|
+            default_connection_error(self, e)
+        )?;
+
+        return resp.json().map_err(|e|
+            CerberusError::DevFault(
+                format!("Failed to deserialize SubscriptionSummary raw: {}", e))
+        );
+    }
+
+    pub fn subscription_raw(
+        &self,
+        stream: &str,
+        group_id: &str,
+    ) -> CerberusResult<serde_json::value::Value> {
+        let url = format!(
+            "http://{}:{}/subscriptions/{}/{}/info",
+            self.host(), self.port(), stream, group_id);
+
+        let req = self.client.get(&url);
 
         let mut resp = req.send().map_err(|e|
             default_connection_error(self, e)

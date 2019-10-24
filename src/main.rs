@@ -47,7 +47,7 @@ fn main()
             .about("List database entities")
             .arg(Arg::with_name("ENTITY")
                 .required(true)
-                .help("Database entity [events, subscriptions,…etc]"))
+                .help("Database entity [events, …etc]"))
             .arg(Arg::with_name("stream")
                 .help("For events and subscription entities, represents a stream's name")
                 .short("s")
@@ -77,6 +77,26 @@ fn main()
                 .long("recent"))
             .arg(Arg::with_name("raw")
                 .help("For subscription(s) entities, show as much data as the server provides")
+                .long("raw")))
+        .subcommand(SubCommand::with_name("list-subscription")
+            .about("List a persistent subscription information")
+            .arg(Arg::with_name("stream")
+                .help("For events and subscription entities, represents a stream's name")
+                .short("s")
+                .long("stream")
+                .value_name("STREAM_NAME")
+                .takes_value(true)
+                .required(true))
+            .arg(Arg::with_name("group-id")
+                .help("A persistent subscription's group-id")
+                .long("group-id")
+                .value_name("GROUP_ID")
+                .takes_value(true)
+                .required(true)))
+        .subcommand(SubCommand::with_name("list-subscriptions")
+            .about("List persistent subscriptions")
+            .arg(Arg::with_name("raw")
+                .help("Displays the persistent subscriptions as-is from the server")
                 .long("raw")))
         .subcommand(SubCommand::with_name("create-subscription")
             .about("Create a persistent subscription")
@@ -325,19 +345,15 @@ fn main()
                     command::list::streams::run(&matches, params)
                 },
 
-                "subscriptions" => {
-                    command::list::subscriptions::run(&matches, params, api)
-                },
-
-                "subscription" => {
-                    command::list::subscription::run(&matches, params, user_opt)
-                },
-
                 ignored =>
                     Err(
                         common::CerberusError::UserFault(
                             format!("Listing [{}] entity is not supported yet", ignored))),
             }
+        } else if let Some(params) = matches.subcommand_matches("list-subscriptions") {
+            command::list::subscriptions::run(&matches, params, api)
+        } else if let Some(params) = matches.subcommand_matches("list-subscription") {
+            command::list::subscription::run(&matches, params, api)
         } else if let Some(params) = matches.subcommand_matches("create-subscription") {
             command::create::subscription::run(&matches, params, user_opt)
         } else if let Some(params) = matches.subcommand_matches("update-subscription") {
