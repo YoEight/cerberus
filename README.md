@@ -22,6 +22,8 @@ Those features are not listed into an implementation order.
 - [x] Comprehensive projection listing.
 - [x] Comprehensive persistent subscription lising.
 - [x] Create persistent subscription.
+- [x] Update persistent subscription.
+- [x] Delete persistent subscription.
 - [x] Create projection.
 - [ ] Provide a packaged version to Linux (APT for inst., .deb,…etc), OSX (Homebrew) and whatever is used on Windows.
 - [ ] Display cluster information.
