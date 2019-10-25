@@ -245,7 +245,7 @@ pub mod projection {
         let info = api.projection_cropped_info(&result.name)?;
 
         if info.status == "Faulted" {
-            let reason = info.reason.unwrap_or("<unavailable faulted reason>".to_owned());
+            let reason = info.reason.unwrap_or_else(|| "<unavailable faulted reason>".to_owned());
 
             return Err(
                 CerberusError::UserFault(

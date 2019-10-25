@@ -36,7 +36,7 @@ fn default_error_handler<A>(mut resp: reqwest::Response) -> CerberusResult<A> {
                     "Your current user cannot perform that action.".to_owned()));
         }
 
-        let msg = resp.text().unwrap_or("<unreadable text message>".to_owned());
+        let msg = resp.text().unwrap_or_else(|_| "<unreadable text message>".to_owned());
 
         return Err(
             CerberusError::UserFault(
@@ -44,7 +44,7 @@ fn default_error_handler<A>(mut resp: reqwest::Response) -> CerberusResult<A> {
     }
 
     if resp.status().is_server_error() {
-        let msg = resp.text().unwrap_or("<unreadable text message>".to_owned());
+        let msg = resp.text().unwrap_or_else(|_| "<unreadable text message>".to_owned());
 
         return Err(
             CerberusError::UserFault(
@@ -146,7 +146,7 @@ impl<'a> Api<'a> {
 
         if resp.status().is_success() {
             return resp.json().map_err(|e| {
-                let msg = resp.text().unwrap_or("<unreadable text message>".to_owned());
+                let msg = resp.text().unwrap_or_else(|_| "<unreadable text message>".to_owned());
 
                 CerberusError::DevFault(
                     format!(
@@ -238,10 +238,10 @@ impl<'a> Api<'a> {
             default_connection_error(self, e)
         )?;
 
-        return resp.json().map_err(|e|
+        resp.json().map_err(|e|
             CerberusError::DevFault(
                 format!("Failed to deserialize SubscriptionSummary: {}", e))
-        );
+        )
     }
 
     pub fn subscriptions_raw(&self) -> CerberusResult<Vec<serde_json::value::Value>> {
@@ -252,10 +252,10 @@ impl<'a> Api<'a> {
             default_connection_error(self, e)
         )?;
 
-        return resp.json().map_err(|e|
+        resp.json().map_err(|e|
             CerberusError::DevFault(
                 format!("Failed to deserialize SubscriptionSummary raw: {}", e))
-        );
+        )
     }
 
     pub fn subscription_raw(
@@ -273,10 +273,10 @@ impl<'a> Api<'a> {
             default_connection_error(self, e)
         )?;
 
-        return resp.json().map_err(|e|
+        resp.json().map_err(|e|
             CerberusError::UserFault(
                 format!("Failed to deserialize SubscriptionSummary: {}", e))
-        );
+        )
     }
 
     pub fn projections(

@@ -154,7 +154,7 @@ pub fn list_tcp_endpoints(params: &clap::ArgMatches)
     -> CerberusResult<Vec<SocketAddr>>
 {
     let mut hosts = params.values_of_lossy("host")
-        .unwrap_or(vec!["localhost".to_owned()]);
+        .unwrap_or_else(|| vec!["localhost".to_owned()]);
 
     let port = params.value_of("tcp-port").unwrap_or("1113");
     let host = hosts.pop().unwrap();
@@ -227,7 +227,7 @@ pub fn public_tcp_port(global: &clap::ArgMatches) -> u16
 {
 
     let mut ports = global.values_of_lossy("tcp-port")
-        .unwrap_or(vec!["1113".to_owned()]);
+        .unwrap_or_else(|| vec!["1113".to_owned()]);
 
     ports.pop().unwrap().parse().unwrap()
 }
@@ -236,7 +236,7 @@ pub fn public_http_port(global: &clap::ArgMatches) -> u16
 {
 
     let mut ports = global.values_of_lossy("http-port")
-        .unwrap_or(vec!["2113".to_owned()]);
+        .unwrap_or_else(|| vec!["2113".to_owned()]);
 
     ports.pop().unwrap().parse().unwrap()
 }
