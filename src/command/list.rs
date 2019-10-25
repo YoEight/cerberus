@@ -114,15 +114,16 @@ pub mod streams {
 
     fn get_stream_name(params: &clap::ArgMatches) -> String {
         if let Some(category) = params.value_of("category") {
-            return format!("$ce-{}", category);
+            format!("$ce-{}", category)
         } else {
             "$streams".to_owned()
         }
     }
 
-    pub fn run(global: &clap::ArgMatches, params: &clap::ArgMatches)
-        -> CerberusResult<()>
-    {
+    pub fn run(
+        global: &clap::ArgMatches,
+        params: &clap::ArgMatches,
+    ) -> CerberusResult<()> {
         let connection = crate::common::create_connection_default(global)?;
         let stream_name = get_stream_name(params);
 

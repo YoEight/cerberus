@@ -43,41 +43,6 @@ fn main()
             .arg(Arg::with_name("no-cluster-check")
                 .help("Discard cluster connection health-check")
                 .long("no-cluster-check")))
-        .subcommand(SubCommand::with_name("list")
-            .about("List database entities")
-            .arg(Arg::with_name("ENTITY")
-                .required(true)
-                .help("Database entity [events, …etc]"))
-            .arg(Arg::with_name("stream")
-                .help("For events and subscription entities, represents a stream's name")
-                .short("s")
-                .long("stream")
-                .value_name("STREAM_NAME")
-                .takes_value(true))
-            .arg(Arg::with_name("group-id")
-                .help(
-                    "For events and subscription entities, represents persistent subscription's \
-                    group id")
-                .long("group-id")
-                .value_name("GROUP_ID")
-                .takes_value(true))
-            .arg(Arg::with_name("checkpoint")
-                .help(
-                    "For events entity, represents where a persistent subscriptions \
-                    is (in term of event number in the stream). You need to provide \
-                    --with-group-id so this flag is taken into account")
-                .long("checkpoint"))
-            .arg(Arg::with_name("category")
-                .help("For streams entity, list streams by category")
-                .long("by-category")
-                .value_name("CATEGORY")
-                .takes_value(true))
-            .arg(Arg::with_name("recent")
-                .help("For streams and events entities, takes the recent 50 entries")
-                .long("recent"))
-            .arg(Arg::with_name("raw")
-                .help("For subscription(s) entities, show as much data as the server provides")
-                .long("raw")))
         .subcommand(SubCommand::with_name("list-events")
             .about("List stream events")
             .arg(Arg::with_name("stream")
@@ -103,6 +68,21 @@ fn main()
                 .help("Targets events of a given type")
                 .long("by-type")
                 .value_name("Type")
+                .takes_value(true))
+            .arg(Arg::with_name("recent")
+                .help("For streams and events entities, takes the recent 50 entries")
+                .long("recent")))
+        .subcommand(SubCommand::with_name("list-streams")
+            .about(
+                "List streams. Don't expect to see internal streams except \
+                metadata and deletion stream")
+            .arg(Arg::with_name("category")
+                .help(
+                    "List streams by a given category. For example, if you pass \"foo\"
+                    as a category. The command will return streams starting
+                    with \"foo-\"")
+                .long("by-category")
+                .value_name("CATEGORY")
                 .takes_value(true))
             .arg(Arg::with_name("recent")
                 .help("For streams and events entities, takes the recent 50 entries")
@@ -361,20 +341,8 @@ fn main()
     let result = {
         if let Some(params) = matches.subcommand_matches("check") {
             command::check::run(&matches, params, api)
-        } else if let Some(params) = matches.subcommand_matches("list") {
-            let entity = params.value_of("ENTITY")
-                .expect("Already checked by Clap that entity isn't empty");
-
-            match entity {
-                "streams" => {
-                    command::list::streams::run(&matches, params)
-                },
-
-                ignored =>
-                    Err(
-                        common::CerberusError::UserFault(
-                            format!("Listing [{}] entity is not supported yet", ignored))),
-            }
+        } else if let Some(params) = matches.subcommand_matches("list-streams") {
+            command::list::streams::run(&matches, params)
         } else if let Some(params) = matches.subcommand_matches("list-events") {
             command::list::events::run(&matches, params)
         } else if let Some(params) = matches.subcommand_matches("list-subscriptions") {
