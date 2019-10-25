@@ -51,7 +51,7 @@ through OS package managers:
 #### From Crates.io
 
 ```
-$ cargo install cerberus
+$ cargo install cerberus-es
 ```
 
 The program will be available in `~/.cargo/bin`

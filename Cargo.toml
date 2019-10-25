@@ -1,5 +1,5 @@
 [package]
-name = "cerberus"
+name = "cerberus-es"
 version = "0.0.1"
 authors = ["Yorick Laupa <yo.eight@gmail.com>"]
 edition = "2018"
@@ -11,6 +11,9 @@ keywords = ["database", "eventstore"]
 
 categories = ["database"]
 
+[[bin]]
+name = "cerberus"
+path = "src/main.rs"
 
 [dependencies]
 eventstore = "0.4"
