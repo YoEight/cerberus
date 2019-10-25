@@ -63,7 +63,7 @@ pub fn run(
                             member.external_http_port,
                         );
 
-                        if let Some(node_info) = node_api.node_info().ok() {
+                        if let Ok(node_info) = node_api.node_info() {
                             println!("\nVersion: {}", node_info.version);
                         } else {
                             println!(" [Not available]");
@@ -76,10 +76,10 @@ pub fn run(
                     println!("Internal HTTP: {}", member.internal_http_port);
                     println!("State: {}", member.state);
                     println!("Alive: {}", member.is_alive);
-                    println!("");
+                    println!();
                 }
 
-                println!("");
+                println!();
 
                 let endpoint = format!("{}:{}", api.host(), tcp_port)
                     .parse()
