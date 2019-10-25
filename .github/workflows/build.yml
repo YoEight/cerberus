@@ -1,0 +1,20 @@
+name: Build
+
+on: [push]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    container:
+      image: rust:1.38
+
+    steps:
+    - uses: actions/checkout@v1
+    - name: Install
+      run: rustup component add clippy-preview
+    - name: Build
+      run: cargo build
+    - name: Linting
+      run: cargo clippy -- -D warnings
