@@ -1,9 +1,16 @@
 Cerberus
 ========
 
+![Crates.io](https://img.shields.io/crates/v/cerberus-es.svg)
+![Crates.io](https://img.shields.io/crates/d/cerberus-es.svg)
+![Discord](https://img.shields.io/discord/415421715385155584.svg)
+![Crates.io](https://img.shields.io/crates/l/cerberus-es.svg)
+
 An EventStore administration tool.
 
 [EventStore] is an open-source functional database.
+
+[Talk and exchange ideas in our dedicated Discord Server]
 
 Goal
 ====
@@ -148,3 +155,4 @@ Contributions and bug reports are welcome!
 MIT License.
 
 [EventStore]: http://eventstore.org
+[Talk and exchange ideas in our dedicated Discord Server]: https://discord.gg/x7q37jJ
