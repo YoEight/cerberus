@@ -1,13 +1,14 @@
 [package]
 name = "cerberus-es"
-version = "0.0.1"
+version = "0.0.2"
 authors = ["Yorick Laupa <yo.eight@gmail.com>"]
 edition = "2018"
 
 license = "MIT"
 description = "An EventStore administration tool"
 repository = "https://github.com/YoEight/cerberus"
-keywords = ["database", "eventstore"]
+readme = "README.md"
+keywords = ["database", "eventstore", "event", "ges", "eventsourcing"]
 
 categories = ["database"]
 
