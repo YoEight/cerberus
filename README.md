@@ -35,7 +35,7 @@ Those features are not listed into an implementation order.
 - [ ] Provide a packaged version to Linux (APT for inst., .deb,…etc), OSX (Homebrew) and whatever is used on Windows.
 - [ ] Display cluster information.
 - [ ] Expose node statistics.
-- [ ] Comprehensive data migration.
+- [x] Comprehensive data migration.
 - [ ] Comprehensive data export (as JSON file(s) or other human-readable format).
 - [ ] Create a backup archive.
 - [ ] Featureful TUI interface.
