@@ -3,6 +3,7 @@ use serde::{ Serialize, Deserialize };
 use std::error::Error;
 use std::fmt;
 use std::net::{ SocketAddr, ToSocketAddrs };
+use std::time::Duration;
 
 #[derive(Debug, Copy, Clone)]
 pub struct User<'a> {
@@ -200,6 +201,33 @@ pub fn create_connection<F>(params: &clap::ArgMatches, make: F)
 
     if let Some(creds) = credentials_opt {
         builder = builder.with_default_user(creds);
+    }
+
+    if let Some(delay) = params.value_of("tcp-heartbeat-delay") {
+        let delay = delay.parse().map_err(|e|
+            CerberusError::UserFault(
+                format!("Failed to parse --tcp-heartbeat-delay: {}", e))
+        )?;
+
+        builder = builder.heartbeat_delay(Duration::from_millis(delay))
+    }
+
+    if let Some(timeout) = params.value_of("tcp-heartbeat-timeout") {
+        let timeout = timeout.parse().map_err(|e|
+            CerberusError::UserFault(
+                format!("Failed to parse --tcp-heartbeat-timeout: {}", e))
+        )?;
+
+        builder = builder.heartbeat_timeout(Duration::from_millis(timeout))
+    }
+
+    if let Some(count) = params.value_of("tcp-retry-count") {
+        let count = count.parse().map_err(|e|
+            CerberusError::UserFault(
+                format!("Failed to parse --tcp-retry-count: {}", e))
+        )?;
+
+        builder = builder.connection_retry(eventstore::Retry::Only(count))
     }
 
     builder = make(builder);
