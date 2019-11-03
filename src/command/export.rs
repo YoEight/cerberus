@@ -100,7 +100,7 @@ fn export_by_category<S>(
                 record_to_event_data(&record)
             });
 
-            println!("Copy stream {} ...", target_stream_name);
+            info!("Copy stream {} ...", target_stream_name);
 
             destination_connection
                 .write_events(target_stream_name.as_ref())
@@ -156,7 +156,7 @@ fn export_by_stream<S>(
     where
         S: Stream<Item=ResolvedEvent, Error=OperationError>
 {
-    println!("Copy stream {} ...", source_stream_name);
+    info!("Copy stream {} ...", source_stream_name);
 
     let result = stream.chunks(DEFAULT_BUFFER_SIZE).for_each(|events| {
         // Events is garanteed to have at least one element.

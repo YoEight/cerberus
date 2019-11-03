@@ -1,8 +1,12 @@
+#[macro_use]
+extern crate log;
+
 mod api;
 mod command;
 mod common;
 
 use clap::{ Arg, App, SubCommand };
+use std::env;
 
 fn main()
 {
@@ -53,6 +57,10 @@ fn main()
             .help("Max connection retry count in case of connection error [default: 3]")
             .long("tcp-retry-count")
             .takes_value(true))
+        .arg(Arg::with_name("verbose")
+            .help("Log verbosity. The more -v there are, the more verbose it gets")
+            .short("v")
+            .multiple(true))
         .subcommand(SubCommand::with_name("check")
             .about("Check if a database setup is reachable")
             .arg(Arg::with_name("no-cluster-check")
@@ -383,10 +391,27 @@ fn main()
                 .takes_value(true)))
         .get_matches();
 
+
+    let verbosity = matches.occurrences_of("verbose");
     let user_opt = common::User::from_args(&matches);
     let host = crate::common::node_host(&matches);
     let http_port = crate::common::public_http_port(&matches);
     let api = api::Api::new(host, http_port, user_opt);
+
+    if verbosity > 0 {
+        match verbosity {
+            1 =>
+                env::set_var("RUST_LOG", "cerberus=info"),
+
+            2 =>
+                env::set_var("RUST_LOG", "cerberus=info,eventstore=info"),
+
+            _ =>
+                env::set_var("RUST_LOG", "cerberus=debug,eventstore=debug"),
+        }
+
+        env_logger::init();
+    }
 
     let result = {
         if let Some(params) = matches.subcommand_matches("check") {
