@@ -1,6 +1,9 @@
 #[macro_use]
 extern crate log;
 
+#[macro_use]
+extern crate clap;
+
 mod api;
 mod command;
 mod common;
@@ -11,8 +14,8 @@ use std::env;
 fn main()
 {
     let matches = App::new("Cerberus")
-        .version("1.0")
-        .about("An EventStore administration tool.")
+        .version(crate_version!())
+        .about(crate_description!())
         .author("Yorick L. <yo.eight@gmail.com>")
         .arg(Arg::with_name("login")
             .help("Your user's login")
