@@ -396,6 +396,8 @@ fn main()
                 .help("Takes only the latest N entries")
                 .long("top")
                 .takes_value(true)))
+        .subcommand(SubCommand::with_name("dashboard")
+            .about("Start a terminal user interface dashboard"))
         .get_matches();
 
 
@@ -443,6 +445,8 @@ fn main()
             command::list::projections::run(&matches, params, api)
         } else if let Some(params) = matches.subcommand_matches("export") {
             command::export::run(&matches, params)
+        } else if let Some(params) = matches.subcommand_matches("dashboard") {
+            command::dashboard::run(&matches)
         } else {
             Ok(())
         }
