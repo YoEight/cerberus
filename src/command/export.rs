@@ -90,8 +90,7 @@ fn export_by_category<S>(
         // such a case.
         let inner_source = source_connection
             .read_stream(target_stream_name.as_ref())
-            .iterate_over()
-            .chunks(DEFAULT_BUFFER_SIZE);
+            .iterate_over_batch();
 
         inner_source.for_each(move |chunk| {
             let events = chunk.into_iter().map(|event| {
