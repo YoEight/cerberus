@@ -230,6 +230,15 @@ pub fn create_connection<F>(params: &clap::ArgMatches, make: F)
         builder = builder.connection_retry(eventstore::Retry::Only(count))
     }
 
+    if let Some(count) = params.value_of("tcp-operation-retry-count") {
+        let count = count.parse().map_err(|e|
+            CerberusError::UserFault(
+                format!("Failed to parse --tcp-operation-retry-count: {}", e))
+        )?;
+
+        builder = builder.operation_retry(eventstore::Retry::Only(count))
+    }
+
     builder = make(builder);
 
     let endpoint = endpoints.pop().expect("We already checked that list was non-empty");

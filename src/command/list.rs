@@ -1,5 +1,4 @@
 pub mod events {
-    use std::time::Duration;
     use crate::common::{ CerberusResult, CerberusError };
     use eventstore::{ ResolvedEvent, OperationError };
     use futures::future::Future;
@@ -28,11 +27,7 @@ pub mod events {
         global: &clap::ArgMatches,
         params: &clap::ArgMatches,
     ) -> CerberusResult<()> {
-        let connection = crate::common::create_connection(global, |builder|
-            // builder.connection_retry(eventstore::Retry::Only(10))
-            builder.heartbeat_delay(Duration::from_millis(3_000))
-                .heartbeat_timeout(Duration::from_millis(6_000))
-        )?;
+        let connection = crate::common::create_connection_default(global)?;
 
         let stream_name = get_stream_name(params)?;
         let command = connection
