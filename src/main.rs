@@ -445,7 +445,7 @@ fn main()
             command::list::projections::run(&matches, params, api)
         } else if let Some(params) = matches.subcommand_matches("export") {
             command::export::run(&matches, params)
-        } else if let Some(params) = matches.subcommand_matches("dashboard") {
+        } else if matches.subcommand_matches("dashboard").is_some() {
             command::dashboard::run(&matches)
         } else {
             Ok(())
