@@ -17,7 +17,7 @@ name = "cerberus"
 path = "src/main.rs"
 
 [dependencies]
-eventstore = "^0.4.5"
+eventstore = "0.5"
 futures = "0.1"
 clap = "2.33"
 serde = { version = "1.0", features = ["derive"] }
