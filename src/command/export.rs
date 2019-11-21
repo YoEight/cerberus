@@ -80,7 +80,7 @@ fn export_by_category<S>(
     where
         S: Stream<Item=ResolvedEvent, Error=OperationError>
 {
-    let result = stream.for_each(|event| {
+    let result = stream.fold(1usize, |cur, event| {
         let record = event.event.expect("Event field must be defined in this case");
         let target_stream_name = unsafe {
             std::str::from_utf8_unchecked(&record.data).to_owned()
@@ -89,7 +89,7 @@ fn export_by_category<S>(
         // TODO - It's possible the stream is deleted. We should skip it in
         // such a case.
         let inner_source = source_connection
-            .read_stream(target_stream_name.as_ref())
+            .read_stream(target_stream_name.as_str())
             .iterate_over_batch();
 
         inner_source.for_each(move |chunk| {
@@ -99,20 +99,24 @@ fn export_by_category<S>(
                 record_to_event_data(&record)
             });
 
-            info!("Copy stream {} ...", target_stream_name);
+            info!("{} - Copy stream {} ...", cur, target_stream_name);
 
             destination_connection
-                .write_events(target_stream_name.as_ref())
+                .write_events(target_stream_name.as_str())
                 .append_events(events)
                 .execute()
                 .map(|_| ())
-        })
+        }).map(move |_| cur + 1)
     }).wait();
 
-    result.map_err(|e|
-        CerberusError::UserFault(
-            format!("Error occured when exporting by category: {}", e))
-    )
+    match result {
+        Ok(_) =>
+            Ok(()),
+
+        Err(e) =>
+            Err(CerberusError::UserFault(
+                format!("Error occured when exporting by category: {}", e)))
+    }
 }
 
 fn export_by_type<S>(
