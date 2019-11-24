@@ -10,6 +10,9 @@ mod common;
 
 use clap::{ Arg, App, SubCommand };
 use std::env;
+use termion::raw::IntoRawMode;
+use tui::backend::TermionBackend;
+use tui::Terminal;
 
 fn main()
 {
@@ -404,6 +407,9 @@ fn main()
     let host = crate::common::node_host(&matches);
     let http_port = crate::common::public_http_port(&matches);
     let api = api::Api::new(host, http_port, user_opt);
+    let stdout = std::io::stdout().into_raw_mode().unwrap();
+    let backend = TermionBackend::new(stdout);
+    let terminal = Terminal::new(backend).unwrap();
 
     if verbosity > 0 {
         match verbosity {
@@ -422,7 +428,7 @@ fn main()
 
     let result = {
         if let Some(params) = matches.subcommand_matches("check") {
-            command::check::run(&matches, params, api)
+            command::check::run(terminal, &matches, params, api)
         } else if let Some(params) = matches.subcommand_matches("list-streams") {
             command::list::streams::run(&matches, params)
         } else if let Some(params) = matches.subcommand_matches("list-events") {

@@ -6,12 +6,20 @@ use crate::api::{
 };
 
 use futures::future::Future;
+use tui::backend::Backend;
+use tui::layout::{ Constraint, Layout };
+use tui::Terminal;
+use tui::widgets::{ Block, Borders, Row, Table, Widget };
 
-pub fn run(
+pub fn run<B>(
+    mut terminal: Terminal<B>,
     global: &clap::ArgMatches,
     params: &clap::ArgMatches,
     api: Api,
-) -> CerberusResult<()> {
+) -> CerberusResult<()>
+    where
+        B: Backend
+{
     println!("Checking public HTTP port…");
 
     let info = api.node_info().map_err(|tpe| {
@@ -50,34 +58,57 @@ pub fn run(
 
                 let mut tcp_port = 0u16;
 
-                for member in cluster.members {
-                    println!("--------------------------------------------------");
-                    print!("Node: {}", member.external_tcp_ip);
+                let members_info = cluster.members.iter().map(|member| {
+                    let api = api.with_different_node(
+                        &member.external_http_ip,
+                        member.external_http_port,
+                    );
 
-                    if member.external_tcp_ip == api.host() && member.external_http_port == api.port() {
-                        tcp_port = member.external_tcp_port;
-                        println!("\nVersion: {}", info.version);
+                    let status = if member.is_alive {
+                        "Running"
                     } else {
-                        let node_api = api.with_different_node(
-                            &member.external_http_ip,
-                            member.external_http_port,
-                        );
+                        "Down"
+                    };
 
-                        if let Ok(node_info) = node_api.node_info() {
-                            println!("\nVersion: {}", node_info.version);
-                        } else {
-                            println!(" [Not available]");
-                        }
-                    }
+                    api.node_info().ok().map(|info| {
+                        Row::Data(vec![
+                            format!("{}", info.version),
+                            member.external_http_ip.clone(),
+                            member.state.clone(),
+                            status.to_owned(),
+                            format!("{}", member.external_tcp_port),
+                            format!("{}", member.internal_tcp_port),
+                            format!("{}", member.external_http_port),
+                            format!("{}", member.internal_http_port),
+                        ].into_iter())
+                    })
+                }).flatten();
 
-                    println!("Public TCP: {}", member.external_tcp_port);
-                    println!("Internal TCP: {}", member.internal_tcp_port);
-                    println!("Public HTTP: {}", member.external_http_port);
-                    println!("Internal HTTP: {}", member.internal_http_port);
-                    println!("State: {}", member.state);
-                    println!("Alive: {}", member.is_alive);
-                    println!();
-                }
+                //terminal.clear().unwrap();
+                terminal.draw(|mut frame| {
+                    let mut size = frame.size();
+
+                    let headers = [
+                        "Version",
+                        "Ip",
+                        "State",
+                        "Status",
+                        "External TCP port",
+                        "Internal TCP port",
+                        "External HTTP port",
+                        "Internal HTTP port",
+                    ];
+
+                    let rects = Layout::default()
+                        .constraints([Constraint::Percentage(100)].as_ref())
+                        .margin(5)
+                        .split(frame.size());
+
+                    Table::new(headers.into_iter(), members_info)
+                        .block(Block::default().borders(Borders::NONE).title("Cluster Info"))
+                        .widths(&[20, 20, 20, 20, 20, 20, 20, 20])
+                        .render(&mut frame, rects[0]);
+                }).unwrap();
 
                 println!();
 
