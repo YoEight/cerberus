@@ -37,7 +37,7 @@ Those features are not listed into an implementation order.
 - [ ] Expose node statistics.
 - [x] Comprehensive data migration.
 - [ ] Comprehensive data export (as JSON file(s) or other human-readable format).
-- [ ] Create a backup archive.
+- [x] Create a backup archive.
 - [ ] Featureful TUI interface.
 - [ ] Install EventStore locally.
 

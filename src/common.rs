@@ -149,6 +149,13 @@ impl fmt::Display for CerberusError {
     }
 }
 
+impl std::convert::From<std::io::Error> for CerberusError {
+    fn from(source: std::io::Error) -> Self {
+        CerberusError::UserFault(
+            format!("{}", source))
+    }
+}
+
 pub type CerberusResult<A> = Result<A, CerberusError>;
 
 pub fn list_tcp_endpoints(params: &clap::ArgMatches)
@@ -177,6 +184,14 @@ pub fn list_tcp_endpoints(params: &clap::ArgMatches)
                 Ok(endpoints)
             }
         },
+    }
+}
+
+pub fn list_hosts<'a>(params: &'a clap::ArgMatches) -> Vec<&'a str> {
+    if let Some(hosts) = params.values_of("host") {
+        hosts.collect()
+    } else {
+        vec!["localhost"]
     }
 }
 

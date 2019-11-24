@@ -396,6 +396,21 @@ fn main()
                 .help("Takes only the latest N entries")
                 .long("top")
                 .takes_value(true)))
+        .subcommand(SubCommand::with_name("backup")
+            .arg(Arg::with_name("source-directory")
+                .help("Source directory where the backup will be created from")
+                .long("source-directory")
+                .takes_value(true)
+                .required(true))
+            .arg(Arg::with_name("destination-directory")
+                .help("Destination directory where the backup will be stored")
+                .long("destination-directory")
+                .takes_value(true)
+                .required(true))
+            .arg(Arg::with_name("remote-user")
+                .help("User to use on remote server")
+                .long("remote-user")
+                .takes_value(true)))
         .get_matches();
 
 
@@ -443,6 +458,8 @@ fn main()
             command::list::projections::run(&matches, params, api)
         } else if let Some(params) = matches.subcommand_matches("export") {
             command::export::run(&matches, params)
+        } else if let Some(params) = matches.subcommand_matches("backup") {
+            command::backup::run(&matches, params)
         } else {
             Ok(())
         }
