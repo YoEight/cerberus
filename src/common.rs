@@ -156,6 +156,13 @@ impl std::convert::From<std::io::Error> for CerberusError {
     }
 }
 
+impl std::convert::From<toml::de::Error> for CerberusError {
+    fn from(source: toml::de::Error) -> Self {
+        CerberusError::UserFault(
+            format!("TOML parsing error: {}", source))
+    }
+}
+
 pub type CerberusResult<A> = Result<A, CerberusError>;
 
 pub fn list_tcp_endpoints(params: &clap::ArgMatches)

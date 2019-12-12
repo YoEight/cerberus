@@ -38,6 +38,7 @@ Those features are not listed into an implementation order.
 - [x] Comprehensive data migration.
 - [ ] Comprehensive data export (as JSON file(s) or other human-readable format).
 - [x] Create a backup archive.
+- [x] Apply or check database compliance (If a database contains all the persistent subscriptions, projections, or other requirement needed)
 - [ ] Featureful TUI interface.
 - [ ] Install EventStore locally.
 

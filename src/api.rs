@@ -7,6 +7,71 @@ use crate::common::{
     Projection,
 };
 
+use serde::{ Deserialize, Serialize };
+
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct SubscriptionDetail {
+    pub event_stream_id: String,
+    pub group_name: String,
+    pub config: SubscriptionConfig,
+}
+
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
+pub enum NamedConsumerStrategy {
+    RoundRobin,
+    DispatchToSingle,
+    Pinned,
+}
+
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct SubscriptionConfig {
+    pub resolve_linktos: bool,
+    pub start_from: i64,
+    pub message_timeout_milliseconds: usize,
+    pub extra_statistics: bool,
+    pub max_retry_count: usize,
+    pub live_buffer_size: usize,
+    pub buffer_size: usize,
+    pub read_batch_size: usize,
+    pub check_point_after_milliseconds: usize,
+    pub min_check_point_count: usize,
+    pub max_check_point_count: usize,
+    pub max_subscriber_count: usize,
+    pub named_consumer_strategy: NamedConsumerStrategy,
+}
+
+impl Default for SubscriptionConfig {
+    fn default() -> Self {
+        SubscriptionConfig {
+            resolve_linktos: false,
+            start_from: 0,
+            message_timeout_milliseconds: 10_000,
+            extra_statistics: false,
+            max_retry_count: 10,
+            live_buffer_size: 500,
+            buffer_size: 500,
+            read_batch_size: 20,
+            check_point_after_milliseconds: 1_000,
+            min_check_point_count: 10,
+            max_check_point_count: 500,
+            max_subscriber_count: 10,
+            named_consumer_strategy: NamedConsumerStrategy::RoundRobin,
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectionConfig {
+    pub name: String,
+    pub query: String,
+
+    #[serde(default)]
+    pub emit_enabled: bool,
+}
+
 pub struct Api<'a> {
     host: &'a str,
     port: u16,
@@ -19,7 +84,15 @@ pub struct ProjectionConf<'a> {
     pub enabled: bool,
     pub emit: bool,
     pub checkpoints: bool,
+    pub track_emitted_streams: bool,
     pub script: String,
+}
+
+pub struct UpdateProjectionConf<'a> {
+    pub name: &'a str,
+    pub emit: bool,
+    pub track_emitted_streams: bool,
+    pub query: &'a str,
 }
 
 pub enum ClusterState {
@@ -127,11 +200,13 @@ impl<'a> Api<'a> {
         let enabled = format!("{}", conf.enabled);
         let emit = format!("{}", conf.emit);
         let checkpoints = format!("{}", conf.checkpoints);
+        let track_emitted_streams_value = format!("{}", conf.track_emitted_streams);
 
         let mut query = vec![
             ("enabled", enabled.as_str()),
             ("emit", emit.as_str()),
             ("checkpoints", checkpoints.as_str()),
+            ("trackemittedstreams", track_emitted_streams_value.as_str()),
             ("type", "JS")
         ];
 
@@ -169,6 +244,23 @@ impl<'a> Api<'a> {
         &self,
         projection_name: &str,
     ) -> CerberusResult<common::CroppedProjectionInfo> {
+        let info_opt = self.projection_cropped_info_opt(projection_name)?;
+
+        match info_opt {
+            Some(info) =>
+                Ok(info),
+
+            None =>
+                Err(
+                    CerberusError::UserFault(
+                        format!("Projection [{}] doesn't exist.", projection_name))),
+        }
+    }
+
+    pub fn projection_cropped_info_opt(
+        &self,
+        projection_name: &str,
+    ) -> CerberusResult<Option<common::CroppedProjectionInfo>> {
         let req = self.client
             .get(&format!("http://{}:{}/projection/{}", self.host, self.port, projection_name));
 
@@ -178,12 +270,17 @@ impl<'a> Api<'a> {
         })?;
 
         if resp.status().is_success() {
-            return resp.json().map_err(|e| {
+            let info = resp.json().map_err(|e| {
                 CerberusError::DevFault(
                     format!(
                         "We were unable to deserialize CroppedProjectionInfo out \
-                        of projection info request: [{}] {:?}", e, resp))
-            });
+                        of projection info request: [{}] {:?}", e, resp)) })?;
+
+            return Ok(Some(info));
+        }
+
+        if resp.status() == reqwest::StatusCode::NOT_FOUND {
+            return Ok(None);
         }
 
         default_error_handler(resp)
@@ -297,6 +394,57 @@ impl<'a> Api<'a> {
         default_error_handler(resp)
     }
 
+    // Note used at the moment but will be later.
+    fn _subscription(
+        &self,
+        stream: &str,
+        group_id: &str,
+    ) -> CerberusResult<SubscriptionDetail> {
+        let sub_opt = self.subscription_opt(stream, group_id)?;
+
+        match sub_opt {
+            Some(sub) =>
+                Ok(sub),
+
+            None =>
+                Err(
+                    CerberusError::UserFault(
+                        format!("Persistent subscription targetting [{}] stream on group [{}] doesn't exist.", stream, group_id))),
+        }
+    }
+
+    pub fn subscription_opt(
+        &self,
+        stream: &str,
+        group_id: &str,
+    ) -> CerberusResult<Option<SubscriptionDetail>> {
+        let url = format!(
+            "http://{}:{}/subscriptions/{}/{}/info",
+            self.host(), self.port(), stream, group_id);
+
+        let req = self.client.get(&url);
+
+        let mut resp = req.send().map_err(|e|
+            default_connection_error(self, e)
+        )?;
+
+        if resp.status().is_success() {
+            let detail = resp.json().map_err(|e|
+                CerberusError::UserFault(
+                    format!("Failed to deserialize SubscriptionDetail: {}", e))
+            )?;
+
+            return Ok(Some(detail));
+        }
+
+        if resp.status() == reqwest::StatusCode::NOT_FOUND {
+            return Ok(None);
+        }
+
+        default_error_handler(resp)
+    }
+
+
     pub fn projections(
         &self,
         kind: &str,
@@ -315,6 +463,129 @@ impl<'a> Api<'a> {
             )?;
 
             return Ok(result.projections);
+        }
+
+        default_error_handler(resp)
+    }
+
+    pub fn create_subscription(
+        &self,
+        stream: &str,
+        group: &str,
+        config: SubscriptionConfig,
+    ) -> CerberusResult<()> {
+        let url =
+            format!(
+                "http://{}:{}/subscriptions/{}/{}",
+                self.host,
+                self.port,
+                stream,
+                group);
+
+        let req = self.client
+            .put(&url)
+            .header(reqwest::header::CONTENT_TYPE, "application/json;charset=UTF-8")
+            .body(serde_json::to_vec(&config).unwrap());
+
+        let resp = req.send().map_err(|e|
+            default_connection_error(self, e)
+        )?;
+
+        if resp.status().is_success() {
+            return Ok(());
+        }
+
+        default_error_handler(resp)
+    }
+
+    pub fn update_subscription(
+        &self,
+        stream: &str,
+        group: &str,
+        config: SubscriptionConfig,
+    ) -> CerberusResult<()> {
+        let url =
+            format!(
+                "http://{}:{}/subscriptions/{}/{}",
+                self.host,
+                self.port,
+                stream,
+                group);
+
+        let req = self.client
+            .post(&url)
+            .header(reqwest::header::CONTENT_TYPE, "application/json;charset=UTF-8")
+            .body(serde_json::to_vec(&config).unwrap());
+
+        let resp = req.send().map_err(|e|
+            default_connection_error(self, e)
+        )?;
+
+        if resp.status().is_success() {
+            return Ok(());
+        }
+
+        default_error_handler(resp)
+    }
+
+    pub fn projection_config(
+        &self,
+        projection_name: &str,
+    ) -> CerberusResult<ProjectionConfig> {
+        let url = format!(
+            "http://{}:{}/projection/{}/query",
+            self.host(), self.port(), projection_name);
+
+        let query = vec![
+            ("config", "yes"),
+        ];
+
+        let req = self.client
+            .get(&url)
+            .query(&query);
+
+        let mut resp = req.send().map_err(|e|
+            default_connection_error(self, e)
+        )?;
+
+        if resp.status().is_success() {
+            return resp.json().map_err(|e|
+                CerberusError::DevFault(
+                    format!("Failed to deserialize ProjectionConfig: {}", e))
+            );
+        }
+
+        default_error_handler(resp)
+    }
+
+    pub fn update_projection_query(
+        &self,
+        conf: UpdateProjectionConf,
+    ) -> CerberusResult<()> {
+        let url = format!(
+            "http://{}:{}/projection/{}/query",
+            self.host(), self.port(), conf.name);
+
+        let emit_value = format!("{}", conf.emit);
+        let track_emitted_streams_value = format!("{}", conf.track_emitted_streams);
+        let query_params = vec![
+            ("emit", emit_value.as_str()),
+            ("trackemittedstreams", track_emitted_streams_value.as_str()),
+            ("type", "js"),
+        ];
+
+        let req = self.client
+            .put(url.as_str())
+            .header(reqwest::header::CONTENT_TYPE, "application/json;charset=UTF-8")
+            .query(&query_params)
+            .body(conf.query.to_owned());
+
+        let resp = req.send().map_err(|e|
+            default_connection_error(self, e)
+        )?;
+
+        if resp.status().is_success() {
+            return Ok(());
         }
 
         default_error_handler(resp)
