@@ -68,7 +68,7 @@ fn main()
             .help("Log verbosity. The more -v there are, the more verbose it gets")
             .short("v")
             .multiple(true))
-        .subcommand(SubCommand::with_name("check")
+        .subcommand(SubCommand::with_name("check-connection")
             .about("Check if a database setup is reachable")
             .arg(Arg::with_name("no-cluster-check")
                 .help("Discard cluster connection health-check")
@@ -436,7 +436,7 @@ fn main()
     }
 
     let result = {
-        if let Some(params) = matches.subcommand_matches("check") {
+        if let Some(params) = matches.subcommand_matches("check-connection") {
             command::check::run(&matches, params, api)
         } else if let Some(params) = matches.subcommand_matches("list-streams") {
             command::list::streams::run(&matches, params)
