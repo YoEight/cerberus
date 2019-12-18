@@ -412,11 +412,15 @@ fn main()
                 .long("remote-user")
                 .takes_value(true)))
         .subcommand(SubCommand::with_name("apply-compliance")
+            .about("Verifies the database meets all the requirements specified by a compliance file (TOML format)")
             .arg(Arg::with_name("file")
                 .help("Compliance filepath. It requires a TOML file")
                 .long("file")
                 .takes_value(true)
-                .required(true)))
+                .required(true))
+            .arg(Arg::with_name("dry-run")
+                .help("Run the compliance checking process without persisting anything")
+                .long("dry-run")))
         .get_matches();
 
 

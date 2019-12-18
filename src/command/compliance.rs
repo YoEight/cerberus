@@ -136,6 +136,7 @@ pub fn run(
 
     let mut file = File::open(filepath)?;
     let mut buffer: Vec<u8> = Vec::new();
+    let dry_run = params.is_present("dry-run");
 
     file.read_to_end(&mut buffer)?;
 
@@ -146,7 +147,7 @@ pub fn run(
         println!("=============");
 
         for sub in compliance.subscriptions.iter() {
-            let conf = sub.settings.to_sub_config();
+            let mut conf = sub.settings.to_sub_config();
             let detail_opt = api.subscription_opt(
                 sub.stream.as_str(),
                 sub.group.as_str(),
@@ -161,21 +162,33 @@ pub fn run(
                         sub.stream,
                         sub.group);
 
-                    println!("\t\tCreating…");
+                    if dry_run {
+                        println!(
+                            "{}\t\t[DRY-RUN] We would have created that subscription{}",
+                            color::Fg(color::Yellow),
+                            color::Fg(color::Reset));
+                    } else {
+                        println!("\t\tCreating…");
 
-                    api.create_subscription(
-                        sub.stream.as_str(),
-                        sub.group.as_str(),
-                        conf,
-                    )?;
+                        api.create_subscription(
+                            sub.stream.as_str(),
+                            sub.group.as_str(),
+                            conf,
+                        )?;
 
-                    println!(
-                        "\t\t{}Subscription is created.{}",
-                        color::Fg(color::Green),
-                        color::Fg(color::Reset));
+                        println!(
+                            "\t\t{}Subscription is created.{}",
+                            color::Fg(color::Green),
+                            color::Fg(color::Reset));
+                    }
                 },
 
                 Some(detail) => {
+                    // We decide to ignore the very high probability that
+                    // start_from on the server-side configuration is greater.
+                    // TODO - Propose to override that behaviour through a setting.
+                    conf.start_from = detail.config.start_from;
+
                     if conf != detail.config {
                         println!(
                             "\t{}‐‐‐{} Subscription on [{}] with group [{}] exists but has a different configuration.",
@@ -211,18 +224,25 @@ pub fn run(
                             }
                         }
 
-                        println!("\n\t\t Updating…");
+                        if dry_run {
+                            println!(
+                                "{}\n\t\t[DRY-RUN] We would have updated that subscription{}",
+                                color::Fg(color::Yellow),
+                                color::Fg(color::Reset));
+                        } else {
+                            println!("\n\t\t Updating…");
 
-                        api.update_subscription(
-                            sub.stream.as_str(),
-                            sub.group.as_str(),
-                            conf,
-                        )?;
+                            api.update_subscription(
+                                sub.stream.as_str(),
+                                sub.group.as_str(),
+                                conf,
+                            )?;
 
-                        println!(
-                            "\n\t\t{}Subscription is updated.{}",
-                            color::Fg(color::Green),
-                            color::Fg(color::Reset));
+                            println!(
+                                "\n\t\t{}Subscription is updated.{}",
+                                color::Fg(color::Green),
+                                color::Fg(color::Reset));
+                        }
                     } else {
                         println!(
                             "\t{}✓✓✓{} Subscription on [{}] with group [{}] is up-to-date.",
@@ -260,12 +280,11 @@ pub fn run(
 
                     // Check for configuration differences and see if we can
                     // improve the situation.
-                    perform_projection_checks(&api, &proj)?;
+                    perform_projection_checks(&api, &proj, dry_run)?;
                 } else {
                     // Supposedly a live status.
-                    perform_projection_checks(&api, &proj)?;
+                    perform_projection_checks(&api, &proj, dry_run)?;
                 }
-
             } else {
                 println!(
                     "\t{}⨯⨯⨯{} Projection [{}] doesn't exist.",
@@ -273,37 +292,44 @@ pub fn run(
                     color::Fg(color::Reset),
                     proj.name);
 
-                println!("\t\tCreating…");
+                if dry_run {
+                    println!(
+                        "{}\t\t[DRY-RUN] We would have created that projection{}",
+                        color::Fg(color::Yellow),
+                        color::Fg(color::Reset));
+                } else {
+                    println!("\t\tCreating…");
 
-                let mut buffer: Vec<u8> = Vec::new();
-                let mut file = File::open(proj.path.as_str())?;
+                    let mut buffer: Vec<u8> = Vec::new();
+                    let mut file = File::open(proj.path.as_str())?;
 
-                file.read_to_end(&mut buffer)?;
+                    file.read_to_end(&mut buffer)?;
 
-                let proj_code = std::str::from_utf8(&buffer).map_err(|e|
-                    CerberusError::UserFault(
-                        format!(
-                            "Projection code located at {} is not encoded in UTF-8: {}",
-                            proj.path,
-                            e)))?;
+                    let proj_code = std::str::from_utf8(&buffer).map_err(|e|
+                        CerberusError::UserFault(
+                            format!(
+                                "Projection code located at {} is not encoded in UTF-8: {}",
+                                proj.path,
+                                e)))?;
 
-                let conf = api::ProjectionConf {
-                    name: Some(proj.name.as_str()),
-                    kind: proj.tpe.get_human_string(),
-                    enabled: proj.enabled,
-                    emit: proj.emit,
-                    checkpoints: proj.checkpoints,
-                    track_emitted_streams: proj.track_emitted_streams,
-                    script: proj_code.to_owned(),
-                };
+                    let conf = api::ProjectionConf {
+                        name: Some(proj.name.as_str()),
+                        kind: proj.tpe.get_human_string(),
+                        enabled: proj.enabled,
+                        emit: proj.emit,
+                        checkpoints: proj.checkpoints,
+                        track_emitted_streams: proj.track_emitted_streams,
+                        script: proj_code.to_owned(),
+                    };
 
-                api.create_projection(conf)?;
+                    api.create_projection(conf)?;
 
-                println!(
-                    "\t\t{}Projection on [{}] is created.{}",
-                    color::Fg(color::Green),
-                    proj.name,
-                    color::Fg(color::Reset));
+                    println!(
+                        "\t\t{}Projection on [{}] is created.{}",
+                        color::Fg(color::Green),
+                        proj.name,
+                        color::Fg(color::Reset));
+                }
             }
         }
     }
@@ -314,6 +340,7 @@ pub fn run(
 fn perform_projection_checks(
     api: &Api,
     proj: &Projection,
+    dry_run: bool,
 ) -> CerberusResult<()> {
     let proj_config = api.projection_config(proj.name.as_str())?;
     let mut buffer: Vec<u8> = Vec::new();
@@ -368,21 +395,28 @@ fn perform_projection_checks(
             }
         }
 
-        println!("\n\t\tUpdating…");
+        if dry_run {
+            println!(
+                "{}\n\t\t[DRY-RUN] We would have updated that projection{}",
+                color::Fg(color::Yellow),
+                color::Fg(color::Reset));
+        } else {
+            println!("\n\t\tUpdating…");
 
-        let conf = api::UpdateProjectionConf {
-            name: proj.name.as_str(),
-            emit: proj.emit,
-            track_emitted_streams: proj.track_emitted_streams,
-            query: latest_proj_code,
-        };
+            let conf = api::UpdateProjectionConf {
+                name: proj.name.as_str(),
+                emit: proj.emit,
+                track_emitted_streams: proj.track_emitted_streams,
+                query: latest_proj_code,
+            };
 
-        api.update_projection_query(conf)?;
+            api.update_projection_query(conf)?;
 
-        println!(
-            "\n\t\t{}Projection query is updated.{}",
-            color::Fg(color::Green),
-            color::Fg(color::Reset));
+            println!(
+                "\n\t\t{}Projection query is updated.{}",
+                color::Fg(color::Green),
+                color::Fg(color::Reset));
+        }
     } else {
         println!(
             "\t{}✓✓✓{} Projection [{}] is up-to-date.",
