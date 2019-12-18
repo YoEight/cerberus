@@ -238,6 +238,7 @@ pub mod projection {
             enabled: params.is_present("enabled"),
             emit: params.is_present("emit"),
             checkpoints: params.is_present("checkpoints"),
+            track_emitted_streams: params.is_present("track-emitted-streams"),
             script,
         };
 

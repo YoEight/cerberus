@@ -411,6 +411,12 @@ fn main()
                 .help("User to use on remote server")
                 .long("remote-user")
                 .takes_value(true)))
+        .subcommand(SubCommand::with_name("apply-compliance")
+            .arg(Arg::with_name("file")
+                .help("Compliance filepath. It requires a TOML file")
+                .long("file")
+                .takes_value(true)
+                .required(true)))
         .get_matches();
 
 
@@ -460,6 +466,8 @@ fn main()
             command::export::run(&matches, params)
         } else if let Some(params) = matches.subcommand_matches("backup") {
             command::backup::run(&matches, params)
+        } else if let Some(params) = matches.subcommand_matches("apply-compliance") {
+            command::compliance::run(&matches, params, api)
         } else {
             Ok(())
         }
