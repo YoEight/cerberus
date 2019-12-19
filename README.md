@@ -141,11 +141,84 @@ This command lists all streams that start with `user-`.
 ## Create a projection
 
 ```
-$ cerberus create-projection -k onetime --name amazing-proj --enabled /path/to/projection.js 
+# You will have to use an user with admin right to use that command.
+$ cerberus --login=boogie_man --password=******* create-projection -k onetime --name amazing-proj --enabled /path/to/projection.js
 ```
 
 The name parameter is optional. In this case, the projection named `amazing-proj` will
 start right away because of the flag `--enabled`.
+
+## Backup
+
+Cerberus supports database backup. That feature requires `rsync` to be in `$PATH`. Currently,
+when in a cluster configuration, Cerberus doesn't backup all the nodes nor it selects the master node.
+We might implement those features mentioned above based on users demand.
+
+Usage:
+```
+cerberus --host=1.2.3.4 backup --remote-user=yoeight --source-directory=/var/eventstore/db --destination-directory=/home/yoeight/es-backup
+```
+
+## Compliance checking
+
+Compliance checking makes sure a database setup is properly configured based on a compliance file. A compliance file
+uses the TOML format. In a compliance file, you can make sure that:
+* Persistent subscriptions are created and also have all their configuration up-to-date.
+* User-defined projections are created and also have all their configuration up-to-date.
+* General database configuration (version, cluster configuration,…etc) WIP.
+
+Example of compliance file:
+```toml
+[[projection]]
+name = "foo-bar-indexing"
+path = "path/to/my/amazing/code.js" # Absolute or relative filepath.
+type = "continuous"                 # [possibilities: "continuous", "one-time"]
+
+# Optional settings
+emit = true # Optional [default: false]. Enable the ability for the
+            # projection to write to streams.
+
+enabled = true # Optional [default: false]. Indicates if the projection
+               # will start right away when created.
+
+checkpoints = true # Optional [default: false]
+                   # [when projection's type is "continuous", forced at true]
+                   # Enable persisting projection progress.
+
+track_emitted_streams = true # Optional [default: false]
+                             # Write the name of the streams the projection is
+                             # managing to a separate stream:
+                             # $projections-{projection-name}-emittedstreams
+
+[[subscription]] # Think persistent subscription.
+stream = "the_world" # The stream doesn't need to exist when creating the subscription.
+group = "illuminatis"
+start_from = 0 # Event number.
+
+# Optional settings
+resolve_link           = false         # Optional [default: false]
+extra_stats            = false         # Optional [default: false]
+msg_timeout_in_ms      = 10_000        # Optional [default: 10_000]
+max_retry_count        = 10            # Optional [default: 10]
+live_buffer_size       = 500           # Optional [default: 500]
+buffer_size            = 500           # Optional [default: 500]
+read_batch_size        = 20            # Optional [default: 20]
+checkpoint_after_in_ms = 1_000         # Optional [default: 1_000]
+min_checkpoint_count   = 10            # Optional [default: 10]
+max_checkpoint_count   = 500           # Optional [default: 500]
+max_subscriber_count   = 10            # Optional [default: 10]
+strategy               = "round-robin" # Optional [default: "round-robin"] [possibilities: "round-robin", "dispatch-to-single", "pinned"]
+```
+
+Usage:
+```
+# You will have to use an user with admin right to use that command.
+cerberus --login=boogie_man --password=******* apply-compliance --file=compliance.toml
+```
+
+Note: if you only want to see if your database configuration is up-to-date without updating
+the database itself, use the `--dry-run` flag. You'll got a complete report without any change
+pushed to the database.
 
 Notes
 =====
