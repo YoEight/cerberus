@@ -19,7 +19,6 @@ struct PersistentSubscriptionSettings {
     pub live_buffer_size: Option<usize>,
     pub read_batch_size: Option<usize>,
     pub buffer_size: Option<usize>,
-    pub history_buffer_size: Option<usize>,
     pub checkpoint_after_in_ms: Option<usize>,
     pub min_checkpoint_count: Option<usize>,
     pub max_checkpoint_count: Option<usize>,
