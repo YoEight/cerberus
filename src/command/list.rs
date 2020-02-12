@@ -1,8 +1,9 @@
 pub mod events {
     use crate::common::{ CerberusResult, CerberusError };
-    use eventstore::{ ResolvedEvent, OperationError };
+    use eventstore::{ResolvedEvent, OperationError, RecordedEvent};
     use futures::future::Future;
     use futures::stream::Stream;
+    use serde_json::Value;
 
     fn get_stream_name(params: &clap::ArgMatches) -> CerberusResult<String> {
         if let Some(original_stream_name) = params.value_of("stream") {
@@ -57,6 +58,10 @@ pub mod events {
                 println!("Type: {}", record.event_type);
                 println!("Id: {}", record.event_id);
 
+                if params.is_present("print-metadata") {
+                    print_metadata(&record);
+                }
+
                 if record.is_json {
                     let result =
                         record.as_json::<serde_json::value::Value>();
@@ -102,6 +107,22 @@ pub mod events {
                     format!("Exception happened when streaming the stream (huhuh): {}", e)))
         } else {
             Ok(())
+        }
+    }
+
+    fn print_metadata(record: &RecordedEvent) {
+        unsafe {
+            let metadata = std::str::from_utf8_unchecked(&record.metadata);
+            let result: Result<Value, _> = serde_json::from_str(metadata);
+            print!("Metadata: ");
+            if let Ok(value) = result {
+                if serde_json::to_writer_pretty(std::io::stdout(), &value).is_ok() {
+                    println!();
+                    return
+                }
+            }
+
+            println!("{}", metadata)
         }
     }
 }
