@@ -3,7 +3,7 @@ use crate::common::{ CerberusError, CerberusResult };
 use serde::{ Serialize, Deserialize };
 use std::fs::File;
 use std::io::Read;
-use termion::color;
+use colored::Colorize;
 
 #[derive(Serialize, Deserialize, Debug)]
 struct PersistentSubscriptionSettings {
@@ -155,17 +155,15 @@ pub fn run(
             match detail_opt {
                 None => {
                     println!(
-                        "\t{}⨯⨯⨯{} Subscription on [{}] with group [{}] doesn't exist.",
-                        color::Fg(color::Red),
-                        color::Fg(color::Reset),
+                        "\t{} Subscription on [{}] with group [{}] doesn't exist.",
+                        "⨯⨯⨯".red(),
                         sub.stream,
                         sub.group);
 
                     if dry_run {
                         println!(
-                            "{}\t\t[DRY-RUN] We would have created that subscription{}",
-                            color::Fg(color::Yellow),
-                            color::Fg(color::Reset));
+                            "\t\t{}",
+                            "[DRY-RUN] We would have created that subscription".yellow());
                     } else {
                         println!("\t\tCreating…");
 
@@ -176,9 +174,8 @@ pub fn run(
                         )?;
 
                         println!(
-                            "\t\t{}Subscription is created.{}",
-                            color::Fg(color::Green),
-                            color::Fg(color::Reset));
+                            "\t\t{}",
+                            "Subscription is created".green());
                     }
                 },
 
@@ -190,9 +187,8 @@ pub fn run(
 
                     if conf != detail.config {
                         println!(
-                            "\t{}‐‐‐{} Subscription on [{}] with group [{}] exists but has a different configuration.",
-                            color::Fg(color::Yellow),
-                            color::Fg(color::Reset),
+                            "\t{} Subscription on [{}] with group [{}] exists but has a different configuration.",
+                            "‐‐‐".yellow(),
                             sub.stream,
                             sub.group);
 
@@ -206,17 +202,15 @@ pub fn run(
                             match d {
                                 diff::Result::Left(l) =>
                                     println!(
-                                        "\t\t\t{}+ {}{}",
-                                        color::Fg(color::Green),
-                                        l,
-                                        color::Fg(color::Reset)),
+                                        "\t\t\t{} {}",
+                                        "+".green(),
+                                        l.green()),
 
                                 diff::Result::Right(r) =>
                                     println!(
-                                        "\t\t\t{}- {}{}",
-                                        color::Fg(color::Red),
-                                        r,
-                                        color::Fg(color::Reset)),
+                                        "\t\t\t{} {}",
+                                        "-".red(),
+                                        r.red()),
 
                                 diff::Result::Both(same, _) =>
                                     println!("\t\t\t {}", same),
@@ -225,9 +219,8 @@ pub fn run(
 
                         if dry_run {
                             println!(
-                                "{}\n\t\t[DRY-RUN] We would have updated that subscription{}",
-                                color::Fg(color::Yellow),
-                                color::Fg(color::Reset));
+                                "\n\t\t{}",
+                                "[DRY-RUN] We would have updated that subscription{}".yellow());
                         } else {
                             println!("\n\t\t Updating…");
 
@@ -238,15 +231,13 @@ pub fn run(
                             )?;
 
                             println!(
-                                "\n\t\t{}Subscription is updated.{}",
-                                color::Fg(color::Green),
-                                color::Fg(color::Reset));
+                                "\n\t\t{}",
+                                "Subscription is updated.".green());
                         }
                     } else {
                         println!(
-                            "\t{}✓✓✓{} Subscription on [{}] with group [{}] is up-to-date.",
-                            color::Fg(color::Green),
-                            color::Fg(color::Reset),
+                            "\t{} Subscription on [{}] with group [{}] is up-to-date.",
+                            "✓✓✓".green(),
                             sub.stream,
                             sub.group);
                     }
@@ -266,16 +257,13 @@ pub fn run(
                         server_proj_info.reason.unwrap_or_else(|| "<No reason given>".to_owned());
 
                     println!(
-                        "\t{}‐‐‐{} Projection [{}] exists but is in faulted status:",
-                        color::Fg(color::Yellow),
-                        color::Fg(color::Reset),
+                        "\t{} Projection [{}] exists but is in faulted status:",
+                        "‐‐‐".yellow(),
                         proj.name);
 
                     println!(
-                        "\t{}{}{}",
-                        color::Fg(color::Red),
-                        reason,
-                        color::Fg(color::Reset));
+                        "\t{}",
+                        reason.red());
 
                     // Check for configuration differences and see if we can
                     // improve the situation.
@@ -286,16 +274,14 @@ pub fn run(
                 }
             } else {
                 println!(
-                    "\t{}⨯⨯⨯{} Projection [{}] doesn't exist.",
-                    color::Fg(color::Red),
-                    color::Fg(color::Reset),
+                    "\t{} Projection [{}] doesn't exist.",
+                    "⨯⨯⨯".red(),
                     proj.name);
 
                 if dry_run {
                     println!(
-                        "{}\t\t[DRY-RUN] We would have created that projection{}",
-                        color::Fg(color::Yellow),
-                        color::Fg(color::Reset));
+                        "\t\t{}",
+                        "[DRY-RUN] We would have created that projection".yellow());
                 } else {
                     println!("\t\tCreating…");
 
@@ -324,10 +310,10 @@ pub fn run(
                     api.create_projection(conf)?;
 
                     println!(
-                        "\t\t{}Projection on [{}] is created.{}",
-                        color::Fg(color::Green),
-                        proj.name,
-                        color::Fg(color::Reset));
+                        "{}",
+                        format!(
+                            "\t\tProjection on [{}] is created.",
+                            proj.name).green());
                 }
             }
         }
@@ -365,9 +351,8 @@ fn perform_projection_checks(
 
     if has_code_differences {
         println!(
-            "\t{}‐‐‐{} Projection [{}] exists but has code differences:",
-            color::Fg(color::Yellow),
-            color::Fg(color::Reset),
+            "\t{} Projection [{}] exists but has code differences:",
+            "‐‐‐".yellow(),
             proj.name);
 
 
@@ -378,17 +363,15 @@ fn perform_projection_checks(
             match d {
                 diff::Result::Left(l) =>
                     println!(
-                        "\t\t\t{}+ {}{}",
-                        color::Fg(color::Green),
-                        l,
-                        color::Fg(color::Reset)),
+                        "\t\t\t{} {}",
+                        "+".green(),
+                        l.green()),
 
                 diff::Result::Right(r) =>
                     println!(
-                        "\t\t\t{}- {}{}",
-                        color::Fg(color::Red),
-                        r,
-                        color::Fg(color::Reset)),
+                        "\t\t\t{} {}",
+                        "-".red(),
+                        r.red()),
 
                 diff::Result::Both(same, _) => println!("\t\t\t {}", same),
             }
@@ -396,9 +379,8 @@ fn perform_projection_checks(
 
         if dry_run {
             println!(
-                "{}\n\t\t[DRY-RUN] We would have updated that projection{}",
-                color::Fg(color::Yellow),
-                color::Fg(color::Reset));
+                "\n\t\t{}",
+                "[DRY-RUN] We would have updated that projection".yellow());
         } else {
             println!("\n\t\tUpdating…");
 
@@ -412,15 +394,13 @@ fn perform_projection_checks(
             api.update_projection_query(conf)?;
 
             println!(
-                "\n\t\t{}Projection query is updated.{}",
-                color::Fg(color::Green),
-                color::Fg(color::Reset));
+                "\n\t\t{}",
+                "Projection query is updated.".green());
         }
     } else {
         println!(
-            "\t{}✓✓✓{} Projection [{}] is up-to-date.",
-            color::Fg(color::Green),
-            color::Fg(color::Reset),
+            "\t{} Projection [{}] is up-to-date.",
+            "✓✓✓".green(),
             proj.name);
     }
 
