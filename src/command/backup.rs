@@ -1,27 +1,24 @@
-use crate::common::{self, CerberusResult, CerberusError};
+use crate::common::{self, CerberusError, CerberusResult};
 use std::process;
 use std::process::Command;
 
 fn check_requirements() -> CerberusResult<()> {
-    let result = Command::new("rsync")
-        .arg("--help")
-        .output();
+    let result = Command::new("rsync").arg("--help").output();
 
     if result.is_err() {
-        return Err(CerberusError::UserFault(
-            "rsync must be installed for the backup command to work".to_owned()));
+        return Err(CerberusError::user_fault(
+            "rsync must be installed for the backup command to work",
+        ));
     }
 
     Ok(())
 }
 
-pub fn run(
-    global: &clap::ArgMatches,
-    params: &clap::ArgMatches,
-) -> CerberusResult<()> {
+pub fn run(global: &clap::ArgMatches, params: &clap::ArgMatches) -> CerberusResult<()> {
     check_requirements()?;
 
-    let destination_directory = params.value_of("destination-directory")
+    let destination_directory = params
+        .value_of("destination-directory")
         .expect("Already check by clap");
 
     let hosts = common::list_hosts(global);
@@ -30,7 +27,8 @@ pub fn run(
         .expect("Safe because list_hosts is always non-empty");
 
     let remote_user_opt = params.value_of("remote-user");
-    let mut source_directory = params.value_of("source-directory")
+    let mut source_directory = params
+        .value_of("source-directory")
         .expect("Already check by clap")
         .to_owned();
 
@@ -67,8 +65,7 @@ pub fn run(
             .status()?;
 
         if !output.success() {
-            return Err(CerberusError::UserFault(
-                "Backup failed".to_owned()));
+            return Err(CerberusError::user_fault("Backup failed"));
         }
     }
 

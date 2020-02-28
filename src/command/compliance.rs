@@ -1,9 +1,9 @@
-use crate::api::{ self, Api };
-use crate::common::{ CerberusError, CerberusResult };
-use serde::{ Serialize, Deserialize };
+use crate::api::{self, Api};
+use crate::common::{CerberusError, CerberusResult};
+use colored::Colorize;
+use serde::{Deserialize, Serialize};
 use std::fs::File;
 use std::io::Read;
-use colored::Colorize;
 
 #[derive(Serialize, Deserialize, Debug)]
 struct PersistentSubscriptionSettings {
@@ -125,13 +125,12 @@ struct Compliance {
     subscriptions: Vec<Subscription>,
 }
 
-pub fn run(
-    _: &clap::ArgMatches,
-    params: &clap::ArgMatches,
-    api: Api,
+pub async fn run(
+    _: &clap::ArgMatches<'_>,
+    params: &clap::ArgMatches<'_>,
+    api: Api<'_>,
 ) -> CerberusResult<()> {
-    let filepath = params.value_of("file")
-        .expect("Already checked by clap");
+    let filepath = params.value_of("file").expect("Already checked by clap");
 
     let mut file = File::open(filepath)?;
     let mut buffer: Vec<u8> = Vec::new();
@@ -147,10 +146,9 @@ pub fn run(
 
         for sub in compliance.subscriptions.iter() {
             let mut conf = sub.settings.to_sub_config();
-            let detail_opt = api.subscription_opt(
-                sub.stream.as_str(),
-                sub.group.as_str(),
-            )?;
+            let detail_opt = api
+                .subscription_opt(sub.stream.as_str(), sub.group.as_str())
+                .await?;
 
             match detail_opt {
                 None => {
@@ -158,26 +156,23 @@ pub fn run(
                         "\t{} Subscription on [{}] with group [{}] doesn't exist.",
                         "⨯⨯⨯".red(),
                         sub.stream,
-                        sub.group);
+                        sub.group
+                    );
 
                     if dry_run {
                         println!(
                             "\t\t{}",
-                            "[DRY-RUN] We would have created that subscription".yellow());
+                            "[DRY-RUN] We would have created that subscription".yellow()
+                        );
                     } else {
                         println!("\t\tCreating…");
 
-                        api.create_subscription(
-                            sub.stream.as_str(),
-                            sub.group.as_str(),
-                            conf,
-                        )?;
+                        api.create_subscription(sub.stream.as_str(), sub.group.as_str(), conf)
+                            .await?;
 
-                        println!(
-                            "\t\t{}",
-                            "Subscription is created".green());
+                        println!("\t\t{}", "Subscription is created".green());
                     }
-                },
+                }
 
                 Some(detail) => {
                     // We decide to ignore the very high probability that
@@ -200,48 +195,40 @@ pub fn run(
 
                         for d in diff::lines(lhs.as_str(), rhs.as_str()) {
                             match d {
-                                diff::Result::Left(l) =>
-                                    println!(
-                                        "\t\t\t{} {}",
-                                        "+".green(),
-                                        l.green()),
+                                diff::Result::Left(l) => {
+                                    println!("\t\t\t{} {}", "+".green(), l.green())
+                                }
 
-                                diff::Result::Right(r) =>
-                                    println!(
-                                        "\t\t\t{} {}",
-                                        "-".red(),
-                                        r.red()),
+                                diff::Result::Right(r) => {
+                                    println!("\t\t\t{} {}", "-".red(), r.red())
+                                }
 
-                                diff::Result::Both(same, _) =>
-                                    println!("\t\t\t {}", same),
+                                diff::Result::Both(same, _) => println!("\t\t\t {}", same),
                             }
                         }
 
                         if dry_run {
                             println!(
                                 "\n\t\t{}",
-                                "[DRY-RUN] We would have updated that subscription{}".yellow());
+                                "[DRY-RUN] We would have updated that subscription{}".yellow()
+                            );
                         } else {
                             println!("\n\t\t Updating…");
 
-                            api.update_subscription(
-                                sub.stream.as_str(),
-                                sub.group.as_str(),
-                                conf,
-                            )?;
+                            api.update_subscription(sub.stream.as_str(), sub.group.as_str(), conf)
+                                .await?;
 
-                            println!(
-                                "\n\t\t{}",
-                                "Subscription is updated.".green());
+                            println!("\n\t\t{}", "Subscription is updated.".green());
                         }
                     } else {
                         println!(
                             "\t{} Subscription on [{}] with group [{}] is up-to-date.",
                             "✓✓✓".green(),
                             sub.stream,
-                            sub.group);
+                            sub.group
+                        );
                     }
-                },
+                }
             }
         }
     }
@@ -251,37 +238,41 @@ pub fn run(
         println!("===========");
 
         for proj in compliance.projections {
-            if let Some(server_proj_info) = api.projection_cropped_info_opt(proj.name.as_str())? {
+            if let Some(server_proj_info) =
+                api.projection_cropped_info_opt(proj.name.as_str()).await?
+            {
                 if server_proj_info.status == "Faulted" {
-                    let reason =
-                        server_proj_info.reason.unwrap_or_else(|| "<No reason given>".to_owned());
+                    let reason = server_proj_info
+                        .reason
+                        .unwrap_or_else(|| "<No reason given>".to_owned());
 
                     println!(
                         "\t{} Projection [{}] exists but is in faulted status:",
                         "‐‐‐".yellow(),
-                        proj.name);
+                        proj.name
+                    );
 
-                    println!(
-                        "\t{}",
-                        reason.red());
+                    println!("\t{}", reason.red());
 
                     // Check for configuration differences and see if we can
                     // improve the situation.
-                    perform_projection_checks(&api, &proj, dry_run)?;
+                    perform_projection_checks(&api, &proj, dry_run).await?;
                 } else {
                     // Supposedly a live status.
-                    perform_projection_checks(&api, &proj, dry_run)?;
+                    perform_projection_checks(&api, &proj, dry_run).await?;
                 }
             } else {
                 println!(
                     "\t{} Projection [{}] doesn't exist.",
                     "⨯⨯⨯".red(),
-                    proj.name);
+                    proj.name
+                );
 
                 if dry_run {
                     println!(
                         "\t\t{}",
-                        "[DRY-RUN] We would have created that projection".yellow());
+                        "[DRY-RUN] We would have created that projection".yellow()
+                    );
                 } else {
                     println!("\t\tCreating…");
 
@@ -290,12 +281,12 @@ pub fn run(
 
                     file.read_to_end(&mut buffer)?;
 
-                    let proj_code = std::str::from_utf8(&buffer).map_err(|e|
-                        CerberusError::UserFault(
-                            format!(
-                                "Projection code located at {} is not encoded in UTF-8: {}",
-                                proj.path,
-                                e)))?;
+                    let proj_code = std::str::from_utf8(&buffer).map_err(|e| {
+                        CerberusError::UserFault(format!(
+                            "Projection code located at {} is not encoded in UTF-8: {}",
+                            proj.path, e
+                        ))
+                    })?;
 
                     let conf = api::ProjectionConf {
                         name: Some(proj.name.as_str()),
@@ -307,13 +298,12 @@ pub fn run(
                         script: proj_code.to_owned(),
                     };
 
-                    api.create_projection(conf)?;
+                    api.create_projection(conf).await?;
 
                     println!(
                         "{}",
-                        format!(
-                            "\t\tProjection on [{}] is created.",
-                            proj.name).green());
+                        format!("\t\tProjection on [{}] is created.", proj.name).green()
+                    );
                 }
             }
         }
@@ -322,56 +312,46 @@ pub fn run(
     Ok(())
 }
 
-fn perform_projection_checks(
-    api: &Api,
+async fn perform_projection_checks(
+    api: &Api<'_>,
     proj: &Projection,
     dry_run: bool,
 ) -> CerberusResult<()> {
-    let proj_config = api.projection_config(proj.name.as_str())?;
+    let proj_config = api.projection_config(proj.name.as_str()).await?;
     let mut buffer: Vec<u8> = Vec::new();
     let mut file = File::open(proj.path.as_str())?;
 
     file.read_to_end(&mut buffer)?;
 
-    let latest_proj_code = std::str::from_utf8(&buffer).map_err(|e|
-        CerberusError::UserFault(
-            format!(
-                "Projection code located at {} is not encoded in UTF-8: {}",
-                proj.path,
-                e)))?;
+    let latest_proj_code = std::str::from_utf8(&buffer).map_err(|e| {
+        CerberusError::UserFault(format!(
+            "Projection code located at {} is not encoded in UTF-8: {}",
+            proj.path, e
+        ))
+    })?;
 
     let diffs = diff::lines(latest_proj_code, proj_config.query.as_str());
-    let has_code_differences = diffs.iter().any(|result|
-        match result {
-            diff::Result::Left(_) => true,
-            diff::Result::Right(_) => true,
-            _ => false,
-        }
-    );
+    let has_code_differences = diffs.iter().any(|result| match result {
+        diff::Result::Left(_) => true,
+        diff::Result::Right(_) => true,
+        _ => false,
+    });
 
     if has_code_differences {
         println!(
             "\t{} Projection [{}] exists but has code differences:",
             "‐‐‐".yellow(),
-            proj.name);
-
+            proj.name
+        );
 
         println!("\t\tCode differences:");
         println!("\t\t----------------");
 
         for d in diffs {
             match d {
-                diff::Result::Left(l) =>
-                    println!(
-                        "\t\t\t{} {}",
-                        "+".green(),
-                        l.green()),
+                diff::Result::Left(l) => println!("\t\t\t{} {}", "+".green(), l.green()),
 
-                diff::Result::Right(r) =>
-                    println!(
-                        "\t\t\t{} {}",
-                        "-".red(),
-                        r.red()),
+                diff::Result::Right(r) => println!("\t\t\t{} {}", "-".red(), r.red()),
 
                 diff::Result::Both(same, _) => println!("\t\t\t {}", same),
             }
@@ -380,7 +360,8 @@ fn perform_projection_checks(
         if dry_run {
             println!(
                 "\n\t\t{}",
-                "[DRY-RUN] We would have updated that projection".yellow());
+                "[DRY-RUN] We would have updated that projection".yellow()
+            );
         } else {
             println!("\n\t\tUpdating…");
 
@@ -391,17 +372,16 @@ fn perform_projection_checks(
                 query: latest_proj_code,
             };
 
-            api.update_projection_query(conf)?;
+            api.update_projection_query(conf).await?;
 
-            println!(
-                "\n\t\t{}",
-                "Projection query is updated.".green());
+            println!("\n\t\t{}", "Projection query is updated.".green());
         }
     } else {
         println!(
             "\t{} Projection [{}] is up-to-date.",
             "✓✓✓".green(),
-            proj.name);
+            proj.name
+        );
     }
 
     Ok(())
