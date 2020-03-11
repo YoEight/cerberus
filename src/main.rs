@@ -8,11 +8,11 @@ mod api;
 mod command;
 mod common;
 
-use clap::{ Arg, App, SubCommand };
+use clap::{App, Arg, SubCommand};
 use std::env;
 
-fn main()
-{
+#[tokio::main]
+async fn main() {
     let matches = App::new("Cerberus")
         .version(crate_version!())
         .about(crate_description!())
@@ -424,7 +424,6 @@ fn main()
                 .long("dry-run")))
         .get_matches();
 
-
     let verbosity = matches.occurrences_of("verbose");
     let user_opt = common::User::from_args(&matches);
     let host = crate::common::node_host(&matches);
@@ -433,14 +432,11 @@ fn main()
 
     if verbosity > 0 {
         match verbosity {
-            1 =>
-                env::set_var("RUST_LOG", "cerberus=info"),
+            1 => env::set_var("RUST_LOG", "cerberus=info"),
 
-            2 =>
-                env::set_var("RUST_LOG", "cerberus=info,eventstore=info"),
+            2 => env::set_var("RUST_LOG", "cerberus=info,eventstore=info"),
 
-            _ =>
-                env::set_var("RUST_LOG", "cerberus=debug,eventstore=debug"),
+            _ => env::set_var("RUST_LOG", "cerberus=debug,eventstore=debug"),
         }
 
         env_logger::init();
@@ -448,42 +444,42 @@ fn main()
 
     let result = {
         if let Some(params) = matches.subcommand_matches("check") {
-            command::check::run(&matches, params, api)
+            command::check::run(&matches, params, api).await
         } else if let Some(params) = matches.subcommand_matches("list-streams") {
-            command::list::streams::run(&matches, params)
+            command::list::streams::run(&matches, params).await
         } else if let Some(params) = matches.subcommand_matches("list-events") {
-            command::list::events::run(&matches, params)
+            command::list::events::run(&matches, params).await
         } else if let Some(params) = matches.subcommand_matches("list-subscriptions") {
-            command::list::subscriptions::run(&matches, params, api)
+            command::list::subscriptions::run(&matches, params, api).await
         } else if let Some(params) = matches.subcommand_matches("list-subscription") {
-            command::list::subscription::run(&matches, params, api)
+            command::list::subscription::run(&matches, params, api).await
         } else if let Some(params) = matches.subcommand_matches("create-subscription") {
-            command::create::subscription::run(&matches, params, user_opt)
+            command::create::subscription::run(&matches, params, user_opt).await
         } else if let Some(params) = matches.subcommand_matches("update-subscription") {
-            command::update::subscription::run(&matches, params, user_opt)
+            command::update::subscription::run(&matches, params, user_opt).await
         } else if let Some(params) = matches.subcommand_matches("delete-subscription") {
-            command::delete::subscription::run(&matches, params, user_opt)
+            command::delete::subscription::run(&matches, params, user_opt).await
         } else if let Some(params) = matches.subcommand_matches("create-projection") {
-            command::create::projection::run(&matches, params, api)
+            command::create::projection::run(&matches, params, api).await
         } else if let Some(params) = matches.subcommand_matches("list-projections") {
-            command::list::projections::run(&matches, params, api)
+            command::list::projections::run(&matches, params, api).await
         } else if let Some(params) = matches.subcommand_matches("export") {
-            command::export::run(&matches, params)
+            command::export::run(&matches, params).await
         } else if let Some(params) = matches.subcommand_matches("backup") {
             command::backup::run(&matches, params)
         } else if let Some(params) = matches.subcommand_matches("apply-compliance") {
-            command::compliance::run(&matches, params, api)
+            command::compliance::run(&matches, params, api).await
         } else {
             Ok(())
         }
     };
 
     match result {
-        Err(e) =>  {
+        Err(e) => {
             eprintln!("{}", e);
 
             std::process::exit(1);
-        },
+        }
 
         _ => std::process::exit(0),
     }

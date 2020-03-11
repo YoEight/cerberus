@@ -1,7 +1,7 @@
-use crate::common::{ CerberusResult, CerberusError };
-use eventstore::{ ResolvedEvent, OperationError };
-use futures::future::Future;
+use crate::common::{CerberusError, CerberusResult};
+use eventstore::{OperationError, ResolvedEvent};
 use futures::stream::Stream;
+use futures::{StreamExt, TryStreamExt};
 
 enum Selection<'a> {
     EventType(&'a str),
@@ -23,9 +23,11 @@ fn get_export_selection<'a>(params: &'a clap::ArgMatches) -> CerberusResult<Sele
         return Ok(Selection::StreamCategory(category));
     }
 
-    Err(CerberusError::UserFault(
+    Err(CerberusError::user_fault(
         "No source submitted. You should at least provide \
-        --from-stream, --from-type or --from-category".to_owned()))
+        --from-stream, --from-type or --from-category"
+            .to_owned(),
+    ))
 }
 
 fn get_stream_name(tpe: &Selection) -> String {
@@ -40,19 +42,17 @@ fn get_limit(params: &clap::ArgMatches) -> CerberusResult<Limit> {
     if params.is_present("recent") {
         Ok(Limit::Top(50))
     } else if let Some(value) = params.value_of("top") {
-        let value = value.parse().map_err(|e|
-            CerberusError::UserFault(
-                format!("Failed to parse --top number: {}", e))
-        )?;
+        let value = value.parse().map_err(|e| {
+            CerberusError::user_fault(format!("Failed to parse --top number: {}", e))
+        })?;
 
         if value == 0 {
-            return Err(
-                CerberusError::UserFault(
-                    "--top parameter must be greater than 0".to_owned()));
+            return Err(CerberusError::user_fault(
+                "--top parameter must be greater than 0".to_owned(),
+            ));
         }
 
         Ok(Limit::Top(value))
-
     } else {
         Ok(Limit::None)
     }
@@ -72,68 +72,64 @@ fn record_to_event_data(record: &eventstore::RecordedEvent) -> eventstore::Event
     data.id(record.event_id)
 }
 
-fn export_by_category<S>(
+async fn export_by_category<S>(
     source_connection: &eventstore::Connection,
     destination_connection: &eventstore::Connection,
-    stream: S,
+    mut stream: S,
 ) -> CerberusResult<()>
-    where
-        S: Stream<Item=ResolvedEvent, Error=OperationError>
+where
+    S: Stream<Item = Result<ResolvedEvent, OperationError>> + Unpin,
 {
-    let result = stream.fold(1usize, |cur, event| {
-        let record = event.event.expect("Event field must be defined in this case");
-        let target_stream_name = unsafe {
-            std::str::from_utf8_unchecked(&record.data).to_owned()
-        };
+    let mut count = 1usize;
+    while let Some(event) = stream.try_next().await? {
+        let record = event
+            .event
+            .expect("Event field must be defined in this case");
+        let target_stream_name = std::string::String::from_utf8_lossy(&record.data).into_owned();
 
         // TODO - It's possible the stream is deleted. We should skip it in
         // such a case.
-        let inner_source = source_connection
+        let mut inner_source = source_connection
             .read_stream(target_stream_name.as_str())
             .iterate_over_batch();
 
-        inner_source.for_each(move |chunk| {
+        while let Some(chunk) = inner_source.try_next().await? {
             let events = chunk.into_iter().map(|event| {
                 let record = event.event.expect("Targetted event must be defined");
 
                 record_to_event_data(&record)
             });
 
-            info!("{} - Copy stream {} ...", cur, target_stream_name);
+            info!("{} - Copy stream {} ...", count, target_stream_name);
 
             destination_connection
                 .write_events(target_stream_name.as_str())
                 .append_events(events)
                 .execute()
-                .map(|_| ())
-        }).map(move |_| cur + 1)
-    }).wait();
+                .await?;
 
-    match result {
-        Ok(_) =>
-            Ok(()),
-
-        Err(e) =>
-            Err(CerberusError::UserFault(
-                format!("Error occured when exporting by category: {}", e)))
+            count += 1;
+        }
     }
+
+    Ok(())
 }
 
-fn export_by_type<S>(
+async fn export_by_type<S>(
     destination_connection: &eventstore::Connection,
-    stream: S,
+    mut stream: S,
 ) -> CerberusResult<()>
-    where
-        S: Stream<Item=ResolvedEvent, Error=OperationError>
+where
+    S: Stream<Item = Result<ResolvedEvent, OperationError>> + Unpin,
 {
-    let result = stream.for_each(|event| {
-        let record = event.event.expect("Event field must be defined in this case");
+    while let Some(event) = stream.try_next().await? {
+        let record = event
+            .event
+            .expect("Event field must be defined in this case");
 
         println!(
             "Copy event {} of type {} to stream {}",
-            record.event_id,
-            record.event_type,
-            record.event_stream_id,
+            record.event_id, record.event_type, record.event_stream_id,
         );
 
         let data = record_to_event_data(&record);
@@ -142,73 +138,75 @@ fn export_by_type<S>(
             .write_events(&*record.event_stream_id)
             .push_event(data)
             .execute()
-            .map(|_| ())
-    }).wait();
+            .await?;
+    }
 
-    result.map_err(|e|
-        CerberusError::UserFault(
-            format!("Error occured when exporting by event's type: {}", e))
-    )
+    Ok(())
 }
 
-fn export_by_stream<S>(
+async fn export_by_stream<S>(
     destination_connection: &eventstore::Connection,
     source_stream_name: &str,
-    stream: S,
+    mut stream: S,
 ) -> CerberusResult<()>
-    where
-        S: Stream<Item=ResolvedEvent, Error=OperationError>
+where
+    S: Stream<Item = Result<ResolvedEvent, OperationError>> + Unpin,
 {
     info!("Copy stream {} ...", source_stream_name);
 
-    let result = stream.chunks(DEFAULT_BUFFER_SIZE).for_each(|events| {
-        // Events is garanteed to have at least one element.
-        let first_record = events
-            .as_slice()[0]
-            .event
-            .as_ref()
-            .expect("Event field must be defined in this case 1.");
+    let mut buffer = Vec::with_capacity(DEFAULT_BUFFER_SIZE);
+    let mut stream_name: String = "".to_string();
 
-        let events = events.iter().map(|event| {
-            let record = event
-                .event
-                .as_ref()
-                .expect("Event field must be defined in this case 2.");
+    // TODO - We can do much better than this. Let's use a double while loop to only have a single
+    // line of code that push events to the eventstore.
+    while let Some(event) = stream.try_next().await? {
+        let record = event.event.expect("Event field must be defined");
+        if buffer.is_empty() {
+            stream_name = record.event_stream_id.clone().to_string();
+        }
 
-            record_to_event_data(record)
-        });
+        buffer.push(record_to_event_data(&record));
 
+        if buffer.len() == DEFAULT_BUFFER_SIZE {
+            destination_connection
+                .write_events(stream_name.as_str())
+                .append_events(buffer.drain(..))
+                .execute()
+                .await?;
+        }
+    }
+
+    if !buffer.is_empty() {
         destination_connection
-            .write_events(&*first_record.event_stream_id)
-            .append_events(events)
+            .write_events(stream_name.as_str())
+            .append_events(buffer.drain(..))
             .execute()
-            .map(|_| ())
-    }).wait();
+            .await?;
+    }
 
-    result.map_err(|e|
-        CerberusError::UserFault(
-            format!("Error occured when exporting from a stream: {}", e))
-    )
+    Ok(())
 }
 
-pub fn run(
-    global: &clap::ArgMatches,
-    params: &clap::ArgMatches,
+pub async fn run(
+    global: &clap::ArgMatches<'_>,
+    params: &clap::ArgMatches<'_>,
 ) -> CerberusResult<()> {
-    let source_connection = crate::common::create_connection_default(global)?;
+    let source_connection = crate::common::create_connection_default(global).await?;
 
     let to_tcp_port = params.value_of("to-tcp-port").unwrap_or_else(|| "1113");
-    let to_host = params.value_of("to-host").expect("to-host presence is already checked by Clap");
+    let to_host = params
+        .value_of("to-host")
+        .expect("to-host presence is already checked by Clap");
 
-    let to_tcp_port: u16 = to_tcp_port.parse().map_err(|e|
-        CerberusError::UserFault(
-            format!("--to-tcp-port parse error: {:?}", e))
-    )?;
+    let to_tcp_port: u16 = to_tcp_port
+        .parse()
+        .map_err(|e| CerberusError::user_fault(format!("--to-tcp-port parse error: {:?}", e)))?;
 
-    let endpoint = format!("{}:{}", to_host, to_tcp_port).parse().map_err(|e|
-        CerberusError::UserFault(
-            format!("Failed to parse destination endpoint: {}", e))
-    )?;
+    let endpoint = format!("{}:{}", to_host, to_tcp_port)
+        .parse()
+        .map_err(|e| {
+            CerberusError::user_fault(format!("Failed to parse destination endpoint: {}", e))
+        })?;
 
     let tpe = get_export_selection(params)?;
     let stream_name = get_stream_name(&tpe);
@@ -218,12 +216,12 @@ pub fn run(
 
     let limit = get_limit(params)?;
 
-    let stream: Box<dyn Stream<Item=ResolvedEvent, Error=OperationError>> =
+    let stream: Box<dyn Stream<Item = Result<ResolvedEvent, OperationError>> + Unpin> =
         if let Limit::Top(limit) = limit {
             let stream = command
                 .start_from_end_of_stream()
                 .iterate_over()
-                .take(limit as u64);
+                .take(limit);
 
             Box::new(stream)
         } else {
@@ -231,16 +229,18 @@ pub fn run(
         };
 
     let destination_connection = eventstore::Connection::builder()
-        .single_node_connection(endpoint);
+        .single_node_connection(endpoint)
+        .await;
 
     match tpe {
-        Selection::StreamCategory(_) =>
-            export_by_category(&source_connection, &destination_connection, stream),
+        Selection::StreamCategory(_) => {
+            export_by_category(&source_connection, &destination_connection, stream).await
+        }
 
-        Selection::EventType(_) =>
-            export_by_type(&destination_connection, stream),
+        Selection::EventType(_) => export_by_type(&destination_connection, stream).await,
 
-        Selection::Stream(source_stream_name) =>
-            export_by_stream(&destination_connection, source_stream_name, stream),
+        Selection::Stream(source_stream_name) => {
+            export_by_stream(&destination_connection, source_stream_name, stream).await
+        }
     }
 }
